@@ -62,6 +62,8 @@ pub fn draw_project_search(ctx: &mut Context, state: &mut State) {
 
             let changed = ctx.editline("query-input", &mut state.project_search_needle);
             ctx.inherit_focus();
+            // Focus the query box when the dialog first pops up.
+            ctx.focus_on_first_present();
             if changed {
                 // Invalidate stale results while the user is typing.
                 state.project_search_results = None;
