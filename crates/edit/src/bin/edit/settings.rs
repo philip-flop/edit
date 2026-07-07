@@ -283,6 +283,9 @@ impl Settings {
         if needs_leading_newline {
             tb.write_raw(b"\n");
         }
+        if needs_setting_separator(&text[..insert_at]) {
+            tb.write_raw(b",\n");
+        }
         for block in missing {
             tb.write_raw(b"\n");
             tb.write_raw(block);
@@ -449,6 +452,66 @@ fn text_buffer_bytes(tb: &TextBuffer) -> Vec<u8> {
 
 fn byte_contains(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+fn needs_setting_separator(text: &[u8]) -> bool {
+    let mut last_significant = None;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut in_line_comment = false;
+    let mut in_block_comment = false;
+    let mut i = 0;
+
+    while i < text.len() {
+        let b = text[i];
+
+        if in_line_comment {
+            in_line_comment = b != b'\n';
+            i += 1;
+            continue;
+        }
+
+        if in_block_comment {
+            in_block_comment = !(b == b'*' && text.get(i + 1) == Some(&b'/'));
+            i += if in_block_comment { 1 } else { 2 };
+            continue;
+        }
+
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if b == b'\\' {
+                escaped = true;
+            } else if b == b'"' {
+                in_string = false;
+                last_significant = Some(b);
+            }
+            i += 1;
+            continue;
+        }
+
+        if b == b'/' && text.get(i + 1) == Some(&b'/') {
+            in_line_comment = true;
+            i += 2;
+            continue;
+        }
+
+        if b == b'/' && text.get(i + 1) == Some(&b'*') {
+            in_block_comment = true;
+            i += 2;
+            continue;
+        }
+
+        if b == b'"' {
+            in_string = true;
+            last_significant = Some(b);
+        } else if !b.is_ascii_whitespace() {
+            last_significant = Some(b);
+        }
+        i += 1;
+    }
+
+    !matches!(last_significant, None | Some(b'{') | Some(b','))
 }
 
 fn settings_json_path() -> Option<PathBuf> {
