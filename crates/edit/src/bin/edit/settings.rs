@@ -58,6 +58,14 @@ const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
         .as_bytes(),
     ),
     (
+        b"\"fileBrowser.showAtStartup\"",
+        concat!(
+            "    // Show the file browser at startup when the editor is wider than 80 columns. Default: false.\n",
+            "    // \"fileBrowser.showAtStartup\": false,\n",
+        )
+        .as_bytes(),
+    ),
+    (
         b"\"commands\"",
         concat!(
             "    // User-defined shell commands, runnable from the \"Command\" menu.\n",
@@ -228,6 +236,8 @@ pub struct Settings {
     pub insert_final_newline: bool,
     /// Enables developer-only diagnostic UI. Defaults to `false`.
     pub developer_mode: bool,
+    /// Show the file browser at startup on wide terminals. Defaults to `false`.
+    pub file_browser_show_at_startup: bool,
 }
 
 struct SettingsCell(SemiRefCell<Settings>);
@@ -301,6 +311,7 @@ impl Settings {
             trim_trailing_whitespace: true,
             insert_final_newline: true,
             developer_mode: false,
+            file_browser_show_at_startup: false,
         }
     }
 
@@ -384,6 +395,11 @@ impl Settings {
                 return Err(apperr::Error::SettingsInvalid("developer.mode"));
             };
             self.developer_mode = b;
+        if let Some(value) = root.get("fileBrowser.showAtStartup") {
+            let Some(b) = value.as_bool() else {
+                return Err(apperr::Error::SettingsInvalid("fileBrowser.showAtStartup"));
+            };
+            self.file_browser_show_at_startup = b;
         }
 
         if let Some(f) = root.get_object("files.associations") {

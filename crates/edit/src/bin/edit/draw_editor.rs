@@ -10,7 +10,6 @@ use edit::helpers::*;
 use edit::input::{kbmod, vk};
 use edit::tui::*;
 use edit::{icu, path};
-use stdext::string_from_utf8_lossy_owned;
 
 use crate::localization::*;
 use crate::state::*;
@@ -157,6 +156,7 @@ fn draw_file_pane(ctx: &mut Context, state: &mut State, content_height: CoordTyp
         state.file_pane_dir = DisplayablePathBuf::from_path(dir);
         state.file_pane_dir_revision = state.file_pane_dir_revision.wrapping_add(1);
         state.file_pane_entries = None;
+        state.file_pane_focus = true;
         ctx.needs_rerender();
     } else if let Some(path) = open_file {
         match state.documents.add_file_path(&path) {
@@ -212,10 +212,10 @@ fn draw_search(ctx: &mut Context, state: &mut State) {
         return;
     }
 
-    let Some(doc) = state.documents.active() else {
+    if state.documents.active().is_none() {
         state.wants_search.kind = StateSearchKind::Hidden;
         return;
-    };
+    }
 
     let mut action = None;
     let mut focus = StateSearchKind::Hidden;
@@ -226,9 +226,11 @@ fn draw_search(ctx: &mut Context, state: &mut State) {
 
         // If the selection is empty, focus the search input field.
         // Otherwise, focus the replace input field, if it exists.
-        if let Some(selection) = doc.buffer.borrow_mut().extract_user_selection(false) {
-            state.search_needle = string_from_utf8_lossy_owned(selection);
+        if let Some(selection) = state.active_user_selection_text() {
+            state.search_needle = selection;
             focus = state.wants_search.kind;
+        } else {
+            state.search_needle.clear();
         }
     }
 
