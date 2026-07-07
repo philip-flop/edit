@@ -2070,3 +2070,18 @@ uk = "Файл вже існує. Перезаписати?"
 vi = "Tệp đã tồn tại. Bạn có muốn ghi đè không?"
 zh-hans = "文件已存在。要覆盖它吗？"
 zh-hant = "檔案已存在。要覆蓋它嗎？"
+
+[EditFindInFiles]
+en = "Find in Files"
+
+[ProjectSearchTitle]
+en = "Find in Files"
+
+[ProjectSearchQueryLabel]
+en = "Search:"
+
+[ProjectSearchNoResults]
+en = "No matches found"
+
+[ProjectSearchSearching]
+en = "Type a query and press Enter"

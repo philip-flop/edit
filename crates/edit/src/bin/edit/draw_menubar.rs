@@ -114,6 +114,10 @@ fn draw_menu_edit(ctx: &mut Context, state: &mut State) {
             state.wants_search.focus = true;
         }
     }
+    if ctx.menubar_menu_button(loc(LocId::EditFindInFiles), 'I', kbmod::CTRL_SHIFT | vk::F) {
+        state.wants_project_search = true;
+        state.project_search_results = None;
+    }
     if ctx.menubar_menu_button(loc(LocId::EditSelectAll), 'A', kbmod::CTRL | vk::A) {
         tb.select_all();
         ctx.needs_rerender();

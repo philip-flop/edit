@@ -95,6 +95,18 @@ impl<T: ?Sized + AsRef<OsStr>> From<&T> for DisplayablePathBuf {
     }
 }
 
+/// A single result row for the project-wide "Find in Files" feature.
+pub struct ProjectSearchMatch {
+    /// Absolute path to the file containing the match.
+    pub path: PathBuf,
+    /// 1-based line of the match.
+    pub line: CoordType,
+    /// 1-based column (grapheme) of the match.
+    pub column: CoordType,
+    /// Pre-rendered `relative/path:line: matched text` display string.
+    pub display: String,
+}
+
 pub struct StateSearch {
     pub kind: StateSearchKind,
     pub focus: bool,
@@ -167,6 +179,12 @@ pub struct State {
     pub search_options: buffer::SearchOptions,
     pub search_success: bool,
 
+    // Project-wide search (find in files across the working directory).
+    pub wants_project_search: bool,
+    pub project_search_needle: String,
+    pub project_search_options: buffer::SearchOptions,
+    pub project_search_results: Option<Vec<ProjectSearchMatch>>,
+
     pub wants_language_picker: bool,
 
     pub wants_encoding_picker: bool,
@@ -224,6 +242,11 @@ impl State {
             search_replacement: Default::default(),
             search_options: Default::default(),
             search_success: true,
+
+            wants_project_search: false,
+            project_search_needle: Default::default(),
+            project_search_options: Default::default(),
+            project_search_results: None,
 
             wants_language_picker: false,
 

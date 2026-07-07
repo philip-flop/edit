@@ -165,6 +165,18 @@ pub struct SearchOptions {
     pub use_regex: bool,
 }
 
+/// A single match produced by [`TextBuffer::find_all`].
+pub struct SearchMatch {
+    /// 1-based line number of the match.
+    pub line: CoordType,
+    /// 1-based column (grapheme) of the match.
+    pub column: CoordType,
+    /// Byte offset of the match start within the buffer.
+    pub offset: usize,
+    /// The full text of the line the match starts on (trailing newline stripped).
+    pub line_text: String,
+}
+
 enum RegexReplacement<'a> {
     Group(i32),
     Text(BVec<'a, u8>),
@@ -1165,6 +1177,48 @@ impl TextBuffer {
 
         self.find_select_next(search, next_search_offset, true);
         Ok(())
+    }
+
+    /// Finds all occurrences of `pattern` in the buffer without modifying the
+    /// cursor or selection. Returns at most `max_matches` matches, each
+    /// annotated with its line/column and the text of the containing line.
+    ///
+    /// This reuses the same ICU-backed matcher as [`TextBuffer::find_and_select`],
+    /// so it honors the same [`SearchOptions`] (case, whole-word, regex).
+    pub fn find_all(
+        &self,
+        pattern: &str,
+        options: SearchOptions,
+        max_matches: usize,
+    ) -> icu::Result<Vec<SearchMatch>> {
+        let mut search = self.find_construct_search(pattern, options)?;
+        let mut out = Vec::new();
+
+        while out.len() < max_matches {
+            let Some(range) = search.regex.next() else { break };
+
+            let beg = self.cursor_move_to_offset_internal(self.cursor, range.start);
+            let pos = beg.logical_pos;
+
+            let line_start = self.cursor_move_to_logical_internal(beg, Point { x: 0, y: pos.y });
+            let line_end = self
+                .cursor_move_to_logical_internal(line_start, Point { x: CoordType::MAX, y: pos.y });
+
+            let mut bytes = Vec::new();
+            self.buffer.extract_raw(line_start.offset..line_end.offset, &mut bytes, 0);
+            let line_text = String::from_utf8_lossy(&bytes)
+                .trim_end_matches(['\r', '\n'])
+                .to_string();
+
+            out.push(SearchMatch {
+                line: pos.y + 1,
+                column: pos.x + 1,
+                offset: range.start,
+                line_text,
+            });
+        }
+
+        Ok(out)
     }
 
     /// Find the next occurrence of the given `pattern` and replace it with `replacement`.
@@ -3141,6 +3195,38 @@ mod tests {
         let mut str = String::new();
         buf.save_as_string(&mut str);
         str
+    }
+
+    #[test]
+    fn find_all_collects_matches() {
+        let mut buf = TextBuffer::new(false).unwrap();
+        buf.set_crlf(false);
+        buf.write_raw(b"foo bar\nbaz foo\nno match here\nFOO again\n");
+
+        // Case-insensitive plain substring (default options).
+        let matches = buf.find_all("foo", SearchOptions::default(), 100).unwrap();
+        assert_eq!(matches.len(), 3);
+
+        assert_eq!(matches[0].line, 1);
+        assert_eq!(matches[0].column, 1);
+        assert_eq!(matches[0].line_text, "foo bar");
+
+        assert_eq!(matches[1].line, 2);
+        assert_eq!(matches[1].column, 5);
+        assert_eq!(matches[1].line_text, "baz foo");
+
+        assert_eq!(matches[2].line, 4);
+        assert_eq!(matches[2].line_text, "FOO again");
+
+        // Case-sensitive should drop the uppercase hit.
+        let sensitive = buf
+            .find_all("foo", SearchOptions { match_case: true, ..Default::default() }, 100)
+            .unwrap();
+        assert_eq!(sensitive.len(), 2);
+
+        // The match cap is honored.
+        let capped = buf.find_all("foo", SearchOptions::default(), 1).unwrap();
+        assert_eq!(capped.len(), 1);
     }
 
     #[test]
