@@ -78,6 +78,14 @@ const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
         )
         .as_bytes(),
     ),
+    (
+        b"\"developer.mode\"",
+        concat!(
+            "    // Enable developer-only diagnostics in the menu bar. Default: false.\n",
+            "    // \"developer.mode\": false,\n",
+        )
+        .as_bytes(),
+    ),
 ];
 
 /// A user-defined shell command, configured via the `commands` array in
@@ -226,6 +234,8 @@ pub struct Settings {
     pub trim_trailing_whitespace: bool,
     /// Ensure the file ends with exactly one final newline on save. Defaults to `true`.
     pub insert_final_newline: bool,
+    /// Enables developer-only diagnostic UI. Defaults to `false`.
+    pub developer_mode: bool,
     /// Show the file browser at startup on wide terminals. Defaults to `false`.
     pub file_browser_show_at_startup: bool,
 }
@@ -283,6 +293,9 @@ impl Settings {
         if needs_leading_newline {
             tb.write_raw(b"\n");
         }
+        if needs_setting_separator(&text[..insert_at]) {
+            tb.write_raw(b",\n");
+        }
         for block in missing {
             tb.write_raw(b"\n");
             tb.write_raw(block);
@@ -297,6 +310,7 @@ impl Settings {
             commands: Vec::new(),
             trim_trailing_whitespace: true,
             insert_final_newline: true,
+            developer_mode: false,
             file_browser_show_at_startup: false,
         }
     }
@@ -376,6 +390,11 @@ impl Settings {
             self.insert_final_newline = b;
         }
 
+        if let Some(value) = root.get("developer.mode") {
+            let Some(b) = value.as_bool() else {
+                return Err(apperr::Error::SettingsInvalid("developer.mode"));
+            };
+            self.developer_mode = b;
         if let Some(value) = root.get("fileBrowser.showAtStartup") {
             let Some(b) = value.as_bool() else {
                 return Err(apperr::Error::SettingsInvalid("fileBrowser.showAtStartup"));
@@ -449,6 +468,66 @@ fn text_buffer_bytes(tb: &TextBuffer) -> Vec<u8> {
 
 fn byte_contains(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+fn needs_setting_separator(text: &[u8]) -> bool {
+    let mut last_significant = None;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut in_line_comment = false;
+    let mut in_block_comment = false;
+    let mut i = 0;
+
+    while i < text.len() {
+        let b = text[i];
+
+        if in_line_comment {
+            in_line_comment = b != b'\n';
+            i += 1;
+            continue;
+        }
+
+        if in_block_comment {
+            in_block_comment = !(b == b'*' && text.get(i + 1) == Some(&b'/'));
+            i += if in_block_comment { 1 } else { 2 };
+            continue;
+        }
+
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if b == b'\\' {
+                escaped = true;
+            } else if b == b'"' {
+                in_string = false;
+                last_significant = Some(b);
+            }
+            i += 1;
+            continue;
+        }
+
+        if b == b'/' && text.get(i + 1) == Some(&b'/') {
+            in_line_comment = true;
+            i += 2;
+            continue;
+        }
+
+        if b == b'/' && text.get(i + 1) == Some(&b'*') {
+            in_block_comment = true;
+            i += 2;
+            continue;
+        }
+
+        if b == b'"' {
+            in_string = true;
+            last_significant = Some(b);
+        } else if !b.is_ascii_whitespace() {
+            last_significant = Some(b);
+        }
+        i += 1;
+    }
+
+    !matches!(last_significant, None | Some(b'{') | Some(b','))
 }
 
 fn settings_json_path() -> Option<PathBuf> {

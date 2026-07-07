@@ -999,6 +999,18 @@ en = "Command"
 [CommandUpdate]
 en = "Update Commands"
 
+# A developer diagnostics menu bar item
+[Debug]
+en = "Debug"
+
+# A developer diagnostics menu item
+[DebugShowThemeColors]
+en = "Show Theme Colors"
+
+# A developer diagnostics dialog title
+[ThemeColorsDialogTitle]
+en = "Theme Colors"
+
 # A menu bar item
 [Help]
 en = "Help"
