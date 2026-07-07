@@ -15,6 +15,7 @@ use edit::{buffer, icu};
 use crate::apperr;
 use crate::documents::DocumentManager;
 use crate::localization::*;
+use crate::settings::CommandSpec;
 
 #[repr(transparent)]
 pub struct FormatApperr(apperr::Error);
@@ -200,6 +201,12 @@ pub struct State {
     pub wants_go_to_file: bool,
     pub wants_about: bool,
     pub wants_close: bool,
+
+    // Output of the last user-defined command run from the "Command" menu
+    // (or its keybinding). See `crate::settings::CommandSpec`.
+    pub command_output_visible: bool,
+    pub command_output_title: String,
+    pub command_output: String,
     pub wants_exit: bool,
     pub wants_goto: bool,
     pub goto_target: String,
@@ -263,6 +270,10 @@ impl State {
             wants_go_to_file: false,
             wants_about: false,
             wants_close: false,
+
+            command_output_visible: false,
+            command_output_title: Default::default(),
+            command_output: Default::default(),
             wants_exit: false,
             wants_goto: false,
             goto_target: Default::default(),
@@ -331,5 +342,91 @@ pub fn draw_error_log(ctx: &mut Context, state: &mut State) {
     }
     if ctx.modal_end() {
         state.error_log_count = 0;
+    }
+}
+
+/// Runs a user-defined command (see [`CommandSpec`]) via the platform shell,
+/// substituting `$FILE` with the active document's path, and shows the
+/// captured stdout/stderr/exit code in a scrollable dialog.
+pub fn run_command(ctx: &mut Context, state: &mut State, spec: &CommandSpec) {
+    let file_path = state
+        .documents
+        .active()
+        .and_then(|doc| doc.path.as_ref())
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let command_str = spec.command.replace("$FILE", &file_path);
+
+    #[cfg(windows)]
+    let output = std::process::Command::new("cmd.exe").arg("/C").arg(&command_str).output();
+    #[cfg(not(windows))]
+    let output = std::process::Command::new("sh").arg("-c").arg(&command_str).output();
+
+    let mut text = String::new();
+    match output {
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let stderr = String::from_utf8_lossy(&out.stderr);
+
+            text.push_str(&stdout);
+            if !stderr.is_empty() {
+                if !text.is_empty() && !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                text.push_str(&stderr);
+            }
+            if !text.is_empty() && !text.ends_with('\n') {
+                text.push('\n');
+            }
+            match out.status.code() {
+                Some(code) => text.push_str(&format!("[exit code: {code}]")),
+                None => text.push_str("[terminated by signal]"),
+            }
+        }
+        Err(err) => {
+            text.push_str(&format!("Failed to run command: {err}"));
+        }
+    }
+
+    state.command_output_title = spec.name.clone();
+    state.command_output = text;
+    state.command_output_visible = true;
+    ctx.needs_rerender();
+}
+
+pub fn draw_dialog_command_output(ctx: &mut Context, state: &mut State) {
+    let width = (ctx.size().width - 20).max(20);
+    let height = (ctx.size().height - 10).max(10);
+
+    ctx.modal_begin("command-output", &state.command_output_title);
+    ctx.attr_intrinsic_size(Size { width, height });
+    {
+        ctx.block_begin("content");
+        ctx.inherit_focus();
+        ctx.attr_padding(Rect::three(0, 1, 1));
+        {
+            ctx.scrollarea_begin("output", Size { width: 0, height: height - 3 });
+            ctx.attr_background_rgba(ctx.indexed_alpha(IndexedColor::Black, 1, 4));
+            {
+                ctx.list_begin("lines");
+                for (i, line) in state.command_output.lines().enumerate() {
+                    ctx.next_block_id_mixin(i as u64);
+                    ctx.list_item(false, line);
+                    ctx.attr_overflow(Overflow::TruncateTail);
+                }
+                ctx.list_end();
+            }
+            ctx.scrollarea_end();
+
+            if ctx.button("ok", loc(LocId::Ok), ButtonStyle::default()) {
+                state.command_output_visible = false;
+            }
+            ctx.attr_position(Position::Center);
+            ctx.inherit_focus();
+        }
+        ctx.block_end();
+    }
+    if ctx.modal_end() {
+        state.command_output_visible = false;
     }
 }

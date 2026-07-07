@@ -364,6 +364,9 @@ fn draw(ctx: &mut Context, state: &mut State) {
     if state.wants_about {
         draw_dialog_about(ctx, state);
     }
+    if state.command_output_visible {
+        draw_dialog_command_output(ctx, state);
+    }
     if ctx.clipboard_ref().wants_host_sync() {
         draw_handle_clipboard_change(ctx, state);
     }
@@ -408,6 +411,10 @@ fn draw(ctx: &mut Context, state: &mut State) {
             state.project_search_results = None;
         } else if key == vk::F3 {
             search_execute(ctx, state, SearchAction::Search);
+        } else if let Some(spec) =
+            Settings::borrow().commands.iter().find(|c| c.key == Some(key)).cloned()
+        {
+            run_command(ctx, state, &spec);
         } else {
             return;
         }

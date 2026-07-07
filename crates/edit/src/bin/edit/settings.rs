@@ -8,6 +8,7 @@ use edit::framebuffer::{
     CATPPUCCIN_FRAPPE, CATPPUCCIN_LATTE, CATPPUCCIN_MACCHIATO, CATPPUCCIN_MOCHA,
     INDEXED_COLORS_COUNT,
 };
+use edit::input::{InputKey, kbmod, vk};
 use edit::json;
 use edit::lsh::{LANGUAGES, Language};
 use edit::oklab::StraightRgba;
@@ -15,6 +16,161 @@ use stdext::arena::{read_to_string, scratch_arena};
 use stdext::arena_format;
 
 use crate::apperr;
+
+const SETTINGS_HEADER: &[u8] = b"{\n";
+const SETTINGS_FOOTER: &[u8] = b"}\n";
+const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
+    (
+        b"\"theme\"",
+        concat!(
+            "    // Color theme. One of: \"system\" (follow the terminal palette),\n",
+            "    // \"catppuccin-latte\", \"catppuccin-frappe\", \"catppuccin-macchiato\",\n",
+            "    // \"catppuccin-mocha\".\n",
+            "    // \"theme\": \"system\",\n",
+        )
+        .as_bytes(),
+    ),
+    (
+        b"\"files.associations\"",
+        concat!(
+            "    // Maps file name globs to language IDs for syntax highlighting.\n",
+            "    // The default is empty (associations are inferred automatically).\n",
+            "    // \"files.associations\": {\n",
+            "    //     \"*.txt\": \"plaintext\"\n",
+            "    // },\n",
+        )
+        .as_bytes(),
+    ),
+    (
+        b"\"files.trimTrailingWhitespace\"",
+        concat!(
+            "    // On save, trim trailing whitespace from every line. Default: true.\n",
+            "    // \"files.trimTrailingWhitespace\": true,\n",
+        )
+        .as_bytes(),
+    ),
+    (
+        b"\"files.insertFinalNewline\"",
+        concat!(
+            "    // On save, ensure the file ends with exactly one newline. Default: true.\n",
+            "    // \"files.insertFinalNewline\": true,\n",
+        )
+        .as_bytes(),
+    ),
+    (
+        b"\"commands\"",
+        concat!(
+            "    // User-defined shell commands, runnable from the \"Command\" menu.\n",
+            "    // \"key\" is optional and accepts things like \"F5\" or \"Ctrl+Shift+B\".\n",
+            "    // \"$FILE\" in \"command\" is replaced with the current file's path.\n",
+            "    // \"commands\": [\n",
+            "    //     { \"name\": \"Build\", \"command\": \"cargo build\", \"key\": \"F5\" },\n",
+            "    //     { \"name\": \"Run gofmt on file\", \"command\": \"gofmt -w $FILE\" }\n",
+            "    // ]\n",
+        )
+        .as_bytes(),
+    ),
+];
+
+/// A user-defined shell command, configured via the `commands` array in
+/// settings.json and exposed through the "Command" menu (and, optionally,
+/// a keybinding).
+#[derive(Clone)]
+pub struct CommandSpec {
+    pub name: String,
+    pub command: String,
+    pub key: Option<InputKey>,
+}
+
+/// Parses a simple `Ctrl+Alt+Shift+<key>` shortcut description, as used by
+/// the `key` field of a `commands` entry in settings.json.
+fn parse_shortcut(s: &str) -> Option<InputKey> {
+    let mut parts = s.split('+').collect::<Vec<_>>();
+    let key = parts.pop()?;
+    if key.is_empty() {
+        return None;
+    }
+
+    let mut modifiers = kbmod::NONE;
+    for m in parts {
+        modifiers |= match m.to_ascii_lowercase().as_str() {
+            "ctrl" | "control" => kbmod::CTRL,
+            "alt" => kbmod::ALT,
+            "shift" => kbmod::SHIFT,
+            "super" | "cmd" | "command" | "win" => kbmod::SUPER,
+            _ => return None,
+        };
+    }
+
+    let base = match key.to_ascii_uppercase().as_str() {
+        "F1" => vk::F1,
+        "F2" => vk::F2,
+        "F3" => vk::F3,
+        "F4" => vk::F4,
+        "F5" => vk::F5,
+        "F6" => vk::F6,
+        "F7" => vk::F7,
+        "F8" => vk::F8,
+        "F9" => vk::F9,
+        "F10" => vk::F10,
+        "F11" => vk::F11,
+        "F12" => vk::F12,
+        "TAB" => vk::TAB,
+        "ESC" | "ESCAPE" => vk::ESCAPE,
+        "ENTER" | "RETURN" => vk::RETURN,
+        "SPACE" => vk::SPACE,
+        "BACKSPACE" | "BACK" => vk::BACK,
+        "DELETE" | "DEL" => vk::DELETE,
+        "INSERT" | "INS" => vk::INSERT,
+        "HOME" => vk::HOME,
+        "END" => vk::END,
+        "UP" => vk::UP,
+        "DOWN" => vk::DOWN,
+        "LEFT" => vk::LEFT,
+        "RIGHT" => vk::RIGHT,
+        "PAGEUP" | "PRIOR" => vk::PRIOR,
+        "PAGEDOWN" | "NEXT" => vk::NEXT,
+        "0" => vk::N0,
+        "1" => vk::N1,
+        "2" => vk::N2,
+        "3" => vk::N3,
+        "4" => vk::N4,
+        "5" => vk::N5,
+        "6" => vk::N6,
+        "7" => vk::N7,
+        "8" => vk::N8,
+        "9" => vk::N9,
+        "A" => vk::A,
+        "B" => vk::B,
+        "C" => vk::C,
+        "D" => vk::D,
+        "E" => vk::E,
+        "F" => vk::F,
+        "G" => vk::G,
+        "H" => vk::H,
+        "I" => vk::I,
+        "J" => vk::J,
+        "K" => vk::K,
+        "L" => vk::L,
+        "M" => vk::M,
+        "N" => vk::N,
+        "O" => vk::O,
+        "P" => vk::P,
+        "Q" => vk::Q,
+        "R" => vk::R,
+        "S" => vk::S,
+        "T" => vk::T,
+        "U" => vk::U,
+        "V" => vk::V,
+        "W" => vk::W,
+        "X" => vk::X,
+        "Y" => vk::Y,
+        "Z" => vk::Z,
+        _ => return None,
+    };
+
+    Some(base | modifiers)
+}
 
 /// The color theme to use for the editor.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -57,6 +213,7 @@ pub struct Settings {
     pub path: PathBuf,
     pub file_associations: Vec<(String, &'static Language)>,
     pub theme: Theme,
+    pub commands: Vec<CommandSpec>,
     /// Trim trailing whitespace from every line on save. Defaults to `true`.
     pub trim_trailing_whitespace: bool,
     /// Ensure the file ends with exactly one final newline on save. Defaults to `true`.
@@ -75,31 +232,51 @@ impl Settings {
     /// Fills the given settings.json text buffer with some initial contents for convenience.
     pub fn bootstrap(tb: &mut TextBuffer) {
         tb.set_crlf(false);
-        tb.write_raw(
-            concat!(
-                "{\n",
-                "    // Color theme. One of: \"system\" (follow the terminal palette),\n",
-                "    // \"catppuccin-latte\", \"catppuccin-frappe\", \"catppuccin-macchiato\",\n",
-                "    // \"catppuccin-mocha\".\n",
-                "    // \"theme\": \"system\",\n",
-                "\n",
-                "    // Maps file name globs to language IDs for syntax highlighting.\n",
-                "    // The default is empty (associations are inferred automatically).\n",
-                "    // \"files.associations\": {\n",
-                "    //     \"*.txt\": \"plaintext\"\n",
-                "    // },\n",
-                "\n",
-                "    // On save, trim trailing whitespace from every line. Default: true.\n",
-                "    // \"files.trimTrailingWhitespace\": true,\n",
-                "\n",
-                "    // On save, ensure the file ends with exactly one newline. Default: true.\n",
-                "    // \"files.insertFinalNewline\": true,\n",
-                "}\n",
-            )
-            .as_bytes(),
-        );
+        tb.write_raw(SETTINGS_HEADER);
+        for (i, &(_, block)) in SETTINGS_TEMPLATE_BLOCKS.iter().enumerate() {
+            if i > 0 {
+                tb.write_raw(b"\n");
+            }
+            tb.write_raw(block);
+        }
+        tb.write_raw(SETTINGS_FOOTER);
         tb.cursor_move_to_logical(Default::default());
         tb.mark_as_clean();
+    }
+
+    /// Appends commented template blocks for any known settings that are not
+    /// already present in the settings file.
+    pub fn ensure_template_blocks(tb: &mut TextBuffer) {
+        if tb.text_length() == 0 {
+            Self::bootstrap(tb);
+            return;
+        }
+
+        let text = text_buffer_bytes(tb);
+        let mut missing = SETTINGS_TEMPLATE_BLOCKS
+            .iter()
+            .filter_map(|&(marker, block)| (!byte_contains(&text, marker)).then_some(block))
+            .peekable();
+
+        if missing.peek().is_none() {
+            return;
+        }
+
+        let insert_at = text
+            .iter()
+            .rposition(|b| !b.is_ascii_whitespace())
+            .filter(|&pos| text[pos] == b'}')
+            .unwrap_or(text.len());
+
+        tb.cursor_move_to_offset(insert_at);
+        let needs_leading_newline = insert_at > 0 && text[insert_at - 1] != b'\n';
+        if needs_leading_newline {
+            tb.write_raw(b"\n");
+        }
+        for block in missing {
+            tb.write_raw(b"\n");
+            tb.write_raw(block);
+        }
     }
 
     const fn new() -> Self {
@@ -107,6 +284,7 @@ impl Settings {
             path: PathBuf::new(),
             file_associations: Vec::new(),
             theme: Theme::System,
+            commands: Vec::new(),
             trim_trailing_whitespace: true,
             insert_final_newline: true,
         }
@@ -204,8 +382,55 @@ impl Settings {
             }
         }
 
+        if let Some(arr) = root.get_array("commands") {
+            for item in arr {
+                let Some(obj) = item.as_object() else {
+                    return Err(apperr::Error::SettingsInvalid("commands"));
+                };
+
+                let Some(name) = obj.get_str("name") else {
+                    return Err(apperr::Error::SettingsInvalid("commands"));
+                };
+                let Some(command) = obj.get_str("command") else {
+                    return Err(apperr::Error::SettingsInvalid("commands"));
+                };
+
+                let key = match obj.get_str("key") {
+                    Some(k) => match parse_shortcut(k) {
+                        Some(key) => Some(key),
+                        None => return Err(apperr::Error::SettingsInvalid("commands.key")),
+                    },
+                    None => None,
+                };
+
+                self.commands.push(CommandSpec {
+                    name: name.to_string(),
+                    command: command.to_string(),
+                    key,
+                });
+            }
+        }
+
         Ok(())
     }
+}
+
+fn text_buffer_bytes(tb: &TextBuffer) -> Vec<u8> {
+    let mut text = Vec::with_capacity(tb.text_length());
+    let mut off = 0;
+    while off < tb.text_length() {
+        let chunk = tb.read_forward(off);
+        if chunk.is_empty() {
+            break;
+        }
+        text.extend_from_slice(chunk);
+        off += chunk.len();
+    }
+    text
+}
+
+fn byte_contains(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack.windows(needle.len()).any(|w| w == needle)
 }
 
 fn settings_json_path() -> Option<PathBuf> {
