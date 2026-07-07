@@ -6,6 +6,7 @@ mod documents;
 mod draw_editor;
 mod draw_filepicker;
 mod draw_menubar;
+mod draw_project_search;
 mod draw_statusbar;
 mod localization;
 mod settings;
@@ -19,6 +20,7 @@ use std::{env, process};
 use draw_editor::*;
 use draw_filepicker::*;
 use draw_menubar::*;
+use draw_project_search::*;
 use draw_statusbar::*;
 use edit::framebuffer::{self, IndexedColor};
 use edit::helpers::*;
@@ -356,6 +358,9 @@ fn draw(ctx: &mut Context, state: &mut State) {
     if state.wants_go_to_file {
         draw_go_to_file(ctx, state);
     }
+    if state.wants_project_search {
+        draw_project_search(ctx, state);
+    }
     if state.wants_about {
         draw_dialog_about(ctx, state);
     }
@@ -398,6 +403,9 @@ fn draw(ctx: &mut Context, state: &mut State) {
         {
             state.wants_search.kind = StateSearchKind::Replace;
             state.wants_search.focus = true;
+        } else if key == kbmod::CTRL_SHIFT | vk::F || key == kbmod::SUPER_SHIFT | vk::F {
+            state.wants_project_search = true;
+            state.project_search_results = None;
         } else if key == vk::F3 {
             search_execute(ctx, state, SearchAction::Search);
         } else {

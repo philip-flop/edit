@@ -220,6 +220,8 @@ pub mod kbmod {
     pub const CTRL_SHIFT: InputKeyMod = InputKeyMod::new(0x05000000);
     pub const ALT_SHIFT: InputKeyMod = InputKeyMod::new(0x06000000);
     pub const CTRL_ALT_SHIFT: InputKeyMod = InputKeyMod::new(0x07000000);
+    /// Super (Windows/Command) + Shift, e.g. macOS Cmd+Shift+F.
+    pub const SUPER_SHIFT: InputKeyMod = InputKeyMod::new(0x0C000000);
 }
 
 /// Mouse input state. Up/Down, Left/Right, etc.
