@@ -104,6 +104,10 @@ fn run() -> apperr::Result<()> {
     });
     apply_theme_colors(&mut tui, &mut state);
 
+    if Settings::borrow().file_browser_show_at_startup && tui.size().width > 80 {
+        state.file_pane_visible = true;
+    }
+
     sys::inject_window_size_into_stdin();
 
     #[cfg(feature = "debug-latency")]
@@ -408,6 +412,7 @@ fn draw(ctx: &mut Context, state: &mut State) {
             state.wants_search.focus = true;
         } else if key == kbmod::CTRL_SHIFT | vk::F || key == kbmod::SUPER_SHIFT | vk::F {
             state.wants_project_search = true;
+            state.project_search_needle = state.active_user_selection_text().unwrap_or_default();
             state.project_search_results = None;
         } else if key == vk::F3 {
             search_execute(ctx, state, SearchAction::Search);
