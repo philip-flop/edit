@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+use edit::buffer::MoveLineDirection;
 use edit::helpers::*;
 use edit::input::{kbmod, vk};
 use edit::tui::*;
@@ -121,6 +122,28 @@ fn draw_menu_edit(ctx: &mut Context, state: &mut State) {
     if ctx.menubar_menu_button(loc(LocId::EditSelectAll), 'A', kbmod::CTRL | vk::A) {
         tb.select_all();
         ctx.needs_rerender();
+    }
+    if ctx.menubar_menu_button(loc(LocId::EditMoveLineUp), 'U', kbmod::ALT | vk::UP) {
+        tb.move_selected_lines(MoveLineDirection::Up);
+        ctx.needs_rerender();
+    }
+    if ctx.menubar_menu_button(loc(LocId::EditMoveLineDown), 'D', kbmod::ALT | vk::DOWN) {
+        tb.move_selected_lines(MoveLineDirection::Down);
+        ctx.needs_rerender();
+    }
+    if ctx.menubar_menu_button(loc(LocId::EditDuplicateLine), 'I', kbmod::CTRL | vk::D) {
+        tb.duplicate_lines();
+        ctx.needs_rerender();
+    }
+    if ctx.menubar_menu_button(loc(LocId::EditDeleteLine), 'K', kbmod::CTRL_SHIFT | vk::K) {
+        tb.delete_lines();
+        ctx.needs_rerender();
+    }
+    if let Some(token) = tb.language().and_then(edit::lsh::line_comment_token) {
+        if ctx.menubar_menu_button(loc(LocId::EditToggleComment), 'G', kbmod::CTRL | vk::SLASH) {
+            tb.toggle_line_comment(token);
+            ctx.needs_rerender();
+        }
     }
     ctx.menubar_menu_end();
 }

@@ -14,6 +14,20 @@ pub use highlighter::*;
 pub use lsh::runtime::Language;
 use stdext::glob::glob_match;
 
+/// Returns the line-comment token for a language (e.g. `//` or `#`), or `None`
+/// if the language has no known single-line comment syntax. Used by the
+/// "Toggle line comment" editor command. Language ids match those in the `.lsh`
+/// definitions (with `_` replaced by `-`).
+pub fn line_comment_token(language: &Language) -> Option<&'static str> {
+    match language.id {
+        "javascript" | "json" | "lsh" => Some("//"),
+        "python" | "shellscript" | "powershell" | "yaml" | "properties" | "ignore"
+        | "git-commit" | "git-rebase" => Some("#"),
+        // "markdown", "diff", and others have no meaningful line comment: no-op.
+        _ => None,
+    }
+}
+
 pub fn process_file_associations<T>(
     associations: &[(T, &'static Language)],
     path: &Path,

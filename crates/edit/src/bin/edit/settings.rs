@@ -57,6 +57,10 @@ pub struct Settings {
     pub path: PathBuf,
     pub file_associations: Vec<(String, &'static Language)>,
     pub theme: Theme,
+    /// Trim trailing whitespace from every line on save. Defaults to `true`.
+    pub trim_trailing_whitespace: bool,
+    /// Ensure the file ends with exactly one final newline on save. Defaults to `true`.
+    pub insert_final_newline: bool,
 }
 
 struct SettingsCell(SemiRefCell<Settings>);
@@ -83,7 +87,13 @@ impl Settings {
                 "    // The default is empty (associations are inferred automatically).\n",
                 "    // \"files.associations\": {\n",
                 "    //     \"*.txt\": \"plaintext\"\n",
-                "    // }\n",
+                "    // },\n",
+                "\n",
+                "    // On save, trim trailing whitespace from every line. Default: true.\n",
+                "    // \"files.trimTrailingWhitespace\": true,\n",
+                "\n",
+                "    // On save, ensure the file ends with exactly one newline. Default: true.\n",
+                "    // \"files.insertFinalNewline\": true,\n",
                 "}\n",
             )
             .as_bytes(),
@@ -93,7 +103,13 @@ impl Settings {
     }
 
     const fn new() -> Self {
-        Settings { path: PathBuf::new(), file_associations: Vec::new(), theme: Theme::System }
+        Settings {
+            path: PathBuf::new(),
+            file_associations: Vec::new(),
+            theme: Theme::System,
+            trim_trailing_whitespace: true,
+            insert_final_newline: true,
+        }
     }
 
     pub fn borrow() -> Ref<'static, Settings> {
@@ -155,6 +171,20 @@ impl Settings {
                 return Err(apperr::Error::SettingsInvalid("theme"));
             };
             self.theme = theme;
+        }
+
+        if let Some(value) = root.get("files.trimTrailingWhitespace") {
+            let Some(b) = value.as_bool() else {
+                return Err(apperr::Error::SettingsInvalid("files.trimTrailingWhitespace"));
+            };
+            self.trim_trailing_whitespace = b;
+        }
+
+        if let Some(value) = root.get("files.insertFinalNewline") {
+            let Some(b) = value.as_bool() else {
+                return Err(apperr::Error::SettingsInvalid("files.insertFinalNewline"));
+            };
+            self.insert_final_newline = b;
         }
 
         if let Some(f) = root.get_object("files.associations") {
