@@ -10,6 +10,8 @@ use edit::helpers::*;
 use edit::input::vk;
 use edit::tui::*;
 
+use stdext::arena_format;
+
 use crate::localization::*;
 use crate::state::*;
 
@@ -33,7 +35,16 @@ pub fn draw_project_search(ctx: &mut Context, state: &mut State) {
     let mut done = false;
     let mut activate: Option<usize> = None;
 
-    ctx.modal_begin("project-search", loc(LocId::ProjectSearchTitle));
+    // Show the search root in the title, e.g. "Find in Files — /path/to/root".
+    let root = search_root(state);
+    let title = arena_format!(
+        ctx.arena(),
+        "{} — {}",
+        loc(LocId::ProjectSearchTitle),
+        root.to_string_lossy()
+    );
+
+    ctx.modal_begin("project-search", &title);
     ctx.attr_intrinsic_size(Size { width, height });
     {
         let contains_focus = ctx.contains_focus();
@@ -56,6 +67,14 @@ pub fn draw_project_search(ctx: &mut Context, state: &mut State) {
 
             if ctx.is_focused() && ctx.consume_shortcut(vk::RETURN) {
                 run_project_search(state);
+
+                // If the search produced any results, open the first one right
+                // away so the user doesn't need a second navigation step.
+                if let Some(results) = &state.project_search_results
+                    && !results.is_empty()
+                {
+                    activate = Some(0);
+                }
             }
         }
         ctx.table_end();
@@ -77,12 +96,24 @@ pub fn draw_project_search(ctx: &mut Context, state: &mut State) {
                     ctx.attr_overflow(Overflow::TruncateTail);
                 }
                 Some(results) => {
+                    // Render the "path:line:" location in an accent color and the
+                    // matched line text in the default foreground color.
+                    let accent = ctx.indexed(IndexedColor::BrightCyan);
+                    let text_fg = ctx.indexed(IndexedColor::Foreground);
+
                     for (idx, m) in results.iter().enumerate() {
                         ctx.next_block_id_mixin(idx as u64);
-                        if ctx.list_item(false, &m.display) == ListSelection::Activated {
+                        ctx.styled_list_item_begin();
+                        ctx.attr_overflow(Overflow::TruncateMiddle);
+
+                        ctx.styled_label_set_foreground(accent);
+                        ctx.styled_label_add_text(&m.location);
+                        ctx.styled_label_set_foreground(text_fg);
+                        ctx.styled_label_add_text(&m.text);
+
+                        if ctx.styled_list_item_end(false) == ListSelection::Activated {
                             activate = Some(idx);
                         }
-                        ctx.attr_overflow(Overflow::TruncateMiddle);
                     }
                 }
             }
@@ -220,13 +251,12 @@ fn scan_file(
     let rel = rel.to_string_lossy();
 
     for m in matches {
-        let text = m.line_text.trim();
-        let display = format!("{}:{}: {}", rel, m.line, text);
         results.push(ProjectSearchMatch {
             path: path.to_path_buf(),
             line: m.line,
             column: m.column,
-            display,
+            location: format!("{}:{}:", rel, m.line),
+            text: format!(" {}", m.line_text.trim()),
         });
     }
 }
@@ -255,14 +285,14 @@ mod tests {
         write(&root, "bin.dat", b"hello\x00binary\n");
 
         let mut results = scan_directory(&root, "hello", SearchOptions::default());
-        results.sort_by(|a, b| a.display.cmp(&b.display));
+        results.sort_by(|a, b| a.location.cmp(&b.location));
 
         // Two hits in a.txt, one in sub/b.txt (case-insensitive).
         // The .git file is ignored and the binary file is skipped.
-        assert_eq!(results.len(), 3, "results: {:?}", results.iter().map(|r| &r.display).collect::<Vec<_>>());
-        assert!(results.iter().all(|r| !r.display.contains("ignored")));
-        assert!(results.iter().all(|r| !r.display.contains("binary")));
-        assert!(results.iter().any(|r| r.display.contains("sub/b.txt") || r.display.contains("sub\\b.txt")));
+        assert_eq!(results.len(), 3, "results: {:?}", results.iter().map(|r| &r.location).collect::<Vec<_>>());
+        assert!(results.iter().all(|r| !r.text.contains("ignored")));
+        assert!(results.iter().all(|r| !r.text.contains("binary")));
+        assert!(results.iter().any(|r| r.location.contains("sub/b.txt") || r.location.contains("sub\\b.txt")));
 
         // Case-sensitive should drop the uppercase HELLO in sub/b.txt.
         let sensitive = scan_directory(

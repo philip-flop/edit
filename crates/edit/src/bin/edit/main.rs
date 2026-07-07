@@ -403,7 +403,7 @@ fn draw(ctx: &mut Context, state: &mut State) {
         {
             state.wants_search.kind = StateSearchKind::Replace;
             state.wants_search.focus = true;
-        } else if key == kbmod::CTRL_SHIFT | vk::F {
+        } else if key == kbmod::CTRL_SHIFT | vk::F || key == kbmod::SUPER_SHIFT | vk::F {
             state.wants_project_search = true;
             state.project_search_results = None;
         } else if key == vk::F3 {

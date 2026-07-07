@@ -103,8 +103,10 @@ pub struct ProjectSearchMatch {
     pub line: CoordType,
     /// 1-based column (grapheme) of the match.
     pub column: CoordType,
-    /// Pre-rendered `relative/path:line: matched text` display string.
-    pub display: String,
+    /// The `relative/path:line:` location prefix (rendered in an accent color).
+    pub location: String,
+    /// The matched line's text (rendered in the default foreground color).
+    pub text: String,
 }
 
 pub struct StateSearch {
