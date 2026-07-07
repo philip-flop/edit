@@ -11,6 +11,7 @@ use edit::helpers::*;
 use edit::oklab::StraightRgba;
 use edit::tui::*;
 use edit::{buffer, icu};
+use stdext::string_from_utf8_lossy_owned;
 
 use crate::apperr;
 use crate::documents::DocumentManager;
@@ -296,6 +297,12 @@ impl State {
         self.error_log_index = (self.error_log_index + 1) % self.error_log.len();
         self.error_log_count = self.error_log.len().min(self.error_log_count + 1);
         true
+    }
+
+    pub fn active_user_selection_text(&self) -> Option<String> {
+        let selection =
+            self.documents.active()?.buffer.borrow_mut().extract_user_selection(false)?;
+        Some(string_from_utf8_lossy_owned(selection))
     }
 }
 
