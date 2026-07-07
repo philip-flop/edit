@@ -70,6 +70,14 @@ const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
         )
         .as_bytes(),
     ),
+    (
+        b"\"developer.mode\"",
+        concat!(
+            "    // Enable developer-only diagnostics in the menu bar. Default: false.\n",
+            "    // \"developer.mode\": false,\n",
+        )
+        .as_bytes(),
+    ),
 ];
 
 /// A user-defined shell command, configured via the `commands` array in
@@ -218,6 +226,8 @@ pub struct Settings {
     pub trim_trailing_whitespace: bool,
     /// Ensure the file ends with exactly one final newline on save. Defaults to `true`.
     pub insert_final_newline: bool,
+    /// Enables developer-only diagnostic UI. Defaults to `false`.
+    pub developer_mode: bool,
 }
 
 struct SettingsCell(SemiRefCell<Settings>);
@@ -287,6 +297,7 @@ impl Settings {
             commands: Vec::new(),
             trim_trailing_whitespace: true,
             insert_final_newline: true,
+            developer_mode: false,
         }
     }
 
@@ -363,6 +374,13 @@ impl Settings {
                 return Err(apperr::Error::SettingsInvalid("files.insertFinalNewline"));
             };
             self.insert_final_newline = b;
+        }
+
+        if let Some(value) = root.get("developer.mode") {
+            let Some(b) = value.as_bool() else {
+                return Err(apperr::Error::SettingsInvalid("developer.mode"));
+            };
+            self.developer_mode = b;
         }
 
         if let Some(f) = root.get_object("files.associations") {

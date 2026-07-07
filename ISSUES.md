@@ -8,4 +8,4 @@ Issues
 - [ ] Highlighted text has bad contrast. Could be related to the first issue
 - [ ] Auto populate find or find-in-files with selected text. If none, clear the search field
 - [ ] Add a setting to show the file browser at startup if the editor is over 80 chars wide
-- [ ] Add a setting to enable developer mode. This will show a "Debug" item in the menu bar. Then add an entry called "Show Theme Colors". This will show a popup that shows all of the combonations of bg and fg colors.
+- [x] Add a setting to enable developer mode. This will show a "Debug" item in the menu bar. Then add an entry called "Show Theme Colors". This will show a popup that shows all of the combonations of bg and fg colors.

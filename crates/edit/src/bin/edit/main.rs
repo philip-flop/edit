@@ -364,6 +364,9 @@ fn draw(ctx: &mut Context, state: &mut State) {
     if state.wants_about {
         draw_dialog_about(ctx, state);
     }
+    if state.wants_theme_colors {
+        draw_dialog_theme_colors(ctx, state);
+    }
     if state.command_output_visible {
         draw_dialog_command_output(ctx, state);
     }

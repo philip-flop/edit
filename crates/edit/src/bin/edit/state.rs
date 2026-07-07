@@ -200,6 +200,7 @@ pub struct State {
     pub wants_indentation_picker: bool,
     pub wants_go_to_file: bool,
     pub wants_about: bool,
+    pub wants_theme_colors: bool,
     pub wants_close: bool,
 
     // Output of the last user-defined command run from the "Command" menu
@@ -269,6 +270,7 @@ impl State {
             wants_indentation_picker: false,
             wants_go_to_file: false,
             wants_about: false,
+            wants_theme_colors: false,
             wants_close: false,
 
             command_output_visible: false,

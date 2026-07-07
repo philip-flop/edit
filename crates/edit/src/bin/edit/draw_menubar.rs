@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 use edit::buffer::MoveLineDirection;
+use edit::framebuffer::IndexedColor;
 use edit::helpers::*;
 use edit::input::{kbmod, vk};
 use edit::tui::*;
@@ -34,6 +35,9 @@ pub fn draw_menubar(ctx: &mut Context, state: &mut State) {
         }
         if ctx.menubar_menu_begin(loc(LocId::Command), 'C') {
             draw_menu_command(ctx, state);
+        }
+        if Settings::borrow().developer_mode && ctx.menubar_menu_begin(loc(LocId::Debug), 'D') {
+            draw_menu_debug(ctx, state);
         }
         if ctx.menubar_menu_begin(loc(LocId::Help), 'H') {
             draw_menu_help(ctx, state);
@@ -192,6 +196,13 @@ fn draw_menu_command(ctx: &mut Context, state: &mut State) {
     ctx.menubar_menu_end();
 }
 
+fn draw_menu_debug(ctx: &mut Context, state: &mut State) {
+    if ctx.menubar_menu_button(loc(LocId::DebugShowThemeColors), 'T', vk::NULL) {
+        state.wants_theme_colors = true;
+    }
+    ctx.menubar_menu_end();
+}
+
 /// Opens the settings file in a new document, bootstrapping it with the
 /// commented template when it is empty. Shared by the File > Preferences
 /// item and the Command > Update Commands item.
@@ -258,5 +269,100 @@ pub fn draw_dialog_about(ctx: &mut Context, state: &mut State) {
     }
     if ctx.modal_end() {
         state.wants_about = false;
+    }
+}
+
+const THEME_COLOR_COUNT: usize = 18;
+const THEME_COLOR_NAMES: [&str; THEME_COLOR_COUNT] = [
+    "blk", "red", "grn", "ylw", "blu", "mag", "cyn", "wht", "bBlk", "bRed", "bGrn", "bYlw", "bBlu",
+    "bMag", "bCyn", "bWht", "bg", "fg",
+];
+
+pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
+    let width = (ctx.size().width - 6).max(32);
+    let height = (ctx.size().height - 6).max(10);
+
+    ctx.modal_begin("theme-colors", loc(LocId::ThemeColorsDialogTitle));
+    ctx.attr_intrinsic_size(Size { width, height });
+    {
+        ctx.block_begin("content");
+        ctx.inherit_focus();
+        ctx.attr_padding(Rect::three(0, 1, 1));
+        {
+            ctx.scrollarea_begin("colors", Size { width: 0, height: height - 3 });
+            ctx.attr_background_rgba(ctx.indexed_alpha(IndexedColor::Black, 1, 4));
+            {
+                ctx.table_begin("matrix");
+                let mut columns = [7; THEME_COLOR_COUNT + 1];
+                columns[0] = 6;
+                ctx.table_set_columns(&columns);
+
+                ctx.table_next_row();
+                ctx.label("corner", "fg/bg");
+                ctx.attr_overflow(Overflow::TruncateTail);
+                for bg in 0..THEME_COLOR_COUNT {
+                    ctx.next_block_id_mixin(bg as u64);
+                    let bg_color = indexed_color(bg);
+                    ctx.label("bg", THEME_COLOR_NAMES[bg]);
+                    ctx.attr_background_rgba(ctx.indexed(bg_color));
+                    ctx.attr_foreground_rgba(ctx.contrasted(ctx.indexed(bg_color)));
+                    ctx.attr_overflow(Overflow::TruncateTail);
+                }
+
+                for fg in 0..THEME_COLOR_COUNT {
+                    ctx.next_block_id_mixin(fg as u64);
+                    ctx.table_next_row();
+                    let fg_color = indexed_color(fg);
+                    ctx.label("fg", THEME_COLOR_NAMES[fg]);
+                    ctx.attr_foreground_rgba(ctx.indexed(fg_color));
+                    ctx.attr_overflow(Overflow::TruncateTail);
+
+                    for bg in 0..THEME_COLOR_COUNT {
+                        ctx.next_block_id_mixin(((fg * THEME_COLOR_COUNT) + bg) as u64);
+                        let bg_color = indexed_color(bg);
+                        ctx.label("swatch", &arena_format!(ctx.arena(), "{fg:02}/{bg:02}"));
+                        ctx.attr_background_rgba(ctx.indexed(bg_color));
+                        ctx.attr_foreground_rgba(ctx.indexed(fg_color));
+                        ctx.attr_overflow(Overflow::TruncateTail);
+                    }
+                }
+                ctx.table_end();
+            }
+            ctx.scrollarea_end();
+
+            if ctx.button("ok", loc(LocId::Ok), ButtonStyle::default()) {
+                state.wants_theme_colors = false;
+            }
+            ctx.attr_position(Position::Center);
+            ctx.inherit_focus();
+        }
+        ctx.block_end();
+    }
+    if ctx.modal_end() {
+        state.wants_theme_colors = false;
+    }
+}
+
+fn indexed_color(index: usize) -> IndexedColor {
+    match index {
+        0 => IndexedColor::Black,
+        1 => IndexedColor::Red,
+        2 => IndexedColor::Green,
+        3 => IndexedColor::Yellow,
+        4 => IndexedColor::Blue,
+        5 => IndexedColor::Magenta,
+        6 => IndexedColor::Cyan,
+        7 => IndexedColor::White,
+        8 => IndexedColor::BrightBlack,
+        9 => IndexedColor::BrightRed,
+        10 => IndexedColor::BrightGreen,
+        11 => IndexedColor::BrightYellow,
+        12 => IndexedColor::BrightBlue,
+        13 => IndexedColor::BrightMagenta,
+        14 => IndexedColor::BrightCyan,
+        15 => IndexedColor::BrightWhite,
+        16 => IndexedColor::Background,
+        17 => IndexedColor::Foreground,
+        _ => unreachable!(),
     }
 }
