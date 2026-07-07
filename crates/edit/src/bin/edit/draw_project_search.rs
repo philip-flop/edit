@@ -34,6 +34,8 @@ pub fn draw_project_search(ctx: &mut Context, state: &mut State) {
     let height = (ctx.size().height - 10).max(10);
     let mut done = false;
     let mut activate: Option<usize> = None;
+    // Set when Enter in the query input should move selection to the first result.
+    let mut focus_first_result = false;
 
     // Show the search root in the title, e.g. "Find in Files — /path/to/root".
     let root = search_root(state);
@@ -68,12 +70,13 @@ pub fn draw_project_search(ctx: &mut Context, state: &mut State) {
             if ctx.is_focused() && ctx.consume_shortcut(vk::RETURN) {
                 run_project_search(state);
 
-                // If the search produced any results, open the first one right
-                // away so the user doesn't need a second navigation step.
+                // If the search produced any results, move the selection to the
+                // first one so the user can open it with another Enter. Opening
+                // is intentionally a separate step.
                 if let Some(results) = &state.project_search_results
                     && !results.is_empty()
                 {
-                    activate = Some(0);
+                    focus_first_result = true;
                 }
             }
         }
@@ -113,6 +116,12 @@ pub fn draw_project_search(ctx: &mut Context, state: &mut State) {
 
                         if ctx.styled_list_item_end(false) == ListSelection::Activated {
                             activate = Some(idx);
+                        }
+
+                        // Move selection/focus onto the first result when the
+                        // query was just submitted.
+                        if idx == 0 && focus_first_result {
+                            ctx.list_item_steal_focus();
                         }
                     }
                 }
