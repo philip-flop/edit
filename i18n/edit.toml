@@ -995,6 +995,10 @@ zh-hant = "跳至檔案…"
 [Command]
 en = "Command"
 
+# A menu item that opens the settings file to edit the command list
+[CommandUpdate]
+en = "Update Commands"
+
 # A menu bar item
 [Help]
 en = "Help"

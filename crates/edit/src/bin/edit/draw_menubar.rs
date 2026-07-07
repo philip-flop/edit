@@ -32,9 +32,7 @@ pub fn draw_menubar(ctx: &mut Context, state: &mut State) {
                 draw_menu_view(ctx, state);
             }
         }
-        if !Settings::borrow().commands.is_empty()
-            && ctx.menubar_menu_begin(loc(LocId::Command), 'C')
-        {
+        if ctx.menubar_menu_begin(loc(LocId::Command), 'C') {
             draw_menu_command(ctx, state);
         }
         if ctx.menubar_menu_begin(loc(LocId::Help), 'H') {
@@ -59,21 +57,10 @@ fn draw_menu_file(ctx: &mut Context, state: &mut State) {
             state.wants_file_picker = StateFilePicker::SaveAs;
         }
     }
-    #[allow(irrefutable_let_patterns)]
-    if let path = Settings::borrow().path.as_path()
-        && !path.as_os_str().is_empty()
+    if !Settings::borrow().path.as_os_str().is_empty()
         && ctx.menubar_menu_button(loc(LocId::FilePreferences), 'P', vk::NULL)
     {
-        match state.documents.add_file_path(path) {
-            Ok(doc) => {
-                if let mut tb = doc.buffer.borrow_mut()
-                    && tb.text_length() == 0
-                {
-                    Settings::bootstrap(&mut tb);
-                }
-            }
-            Err(err) => error_log_add(ctx, state, err),
-        }
+        open_settings_file(ctx, state);
     }
     if state.documents.active().is_some()
         && ctx.menubar_menu_button(loc(LocId::FileClose), 'C', kbmod::CTRL | vk::W)
@@ -198,7 +185,27 @@ fn draw_menu_command(ctx: &mut Context, state: &mut State) {
             run_command(ctx, state, spec);
         }
     }
+    // Always offer a way to edit the command list, even when none are configured.
+    if ctx.menubar_menu_button(loc(LocId::CommandUpdate), 'U', vk::NULL) {
+        open_settings_file(ctx, state);
+    }
     ctx.menubar_menu_end();
+}
+
+/// Opens the settings file in a new document, bootstrapping it with the
+/// commented template when it is empty. Shared by the File > Preferences
+/// item and the Command > Update Commands item.
+fn open_settings_file(ctx: &mut Context, state: &mut State) {
+    let path = Settings::borrow().path.clone();
+    if path.as_os_str().is_empty() {
+        return;
+    }
+    match state.documents.add_file_path(&path) {
+        Ok(doc) => {
+            Settings::ensure_template_blocks(&mut doc.buffer.borrow_mut());
+        }
+        Err(err) => error_log_add(ctx, state, err),
+    }
 }
 
 fn draw_menu_help(ctx: &mut Context, state: &mut State) {

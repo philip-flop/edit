@@ -17,6 +17,61 @@ use stdext::arena_format;
 
 use crate::apperr;
 
+const SETTINGS_HEADER: &[u8] = b"{\n";
+const SETTINGS_FOOTER: &[u8] = b"}\n";
+const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
+    (
+        b"\"theme\"",
+        concat!(
+            "    // Color theme. One of: \"system\" (follow the terminal palette),\n",
+            "    // \"catppuccin-latte\", \"catppuccin-frappe\", \"catppuccin-macchiato\",\n",
+            "    // \"catppuccin-mocha\".\n",
+            "    // \"theme\": \"system\",\n",
+        )
+        .as_bytes(),
+    ),
+    (
+        b"\"files.associations\"",
+        concat!(
+            "    // Maps file name globs to language IDs for syntax highlighting.\n",
+            "    // The default is empty (associations are inferred automatically).\n",
+            "    // \"files.associations\": {\n",
+            "    //     \"*.txt\": \"plaintext\"\n",
+            "    // },\n",
+        )
+        .as_bytes(),
+    ),
+    (
+        b"\"files.trimTrailingWhitespace\"",
+        concat!(
+            "    // On save, trim trailing whitespace from every line. Default: true.\n",
+            "    // \"files.trimTrailingWhitespace\": true,\n",
+        )
+        .as_bytes(),
+    ),
+    (
+        b"\"files.insertFinalNewline\"",
+        concat!(
+            "    // On save, ensure the file ends with exactly one newline. Default: true.\n",
+            "    // \"files.insertFinalNewline\": true,\n",
+        )
+        .as_bytes(),
+    ),
+    (
+        b"\"commands\"",
+        concat!(
+            "    // User-defined shell commands, runnable from the \"Command\" menu.\n",
+            "    // \"key\" is optional and accepts things like \"F5\" or \"Ctrl+Shift+B\".\n",
+            "    // \"$FILE\" in \"command\" is replaced with the current file's path.\n",
+            "    // \"commands\": [\n",
+            "    //     { \"name\": \"Build\", \"command\": \"cargo build\", \"key\": \"F5\" },\n",
+            "    //     { \"name\": \"Run gofmt on file\", \"command\": \"gofmt -w $FILE\" }\n",
+            "    // ]\n",
+        )
+        .as_bytes(),
+    ),
+];
+
 /// A user-defined shell command, configured via the `commands` array in
 /// settings.json and exposed through the "Command" menu (and, optionally,
 /// a keybinding).
@@ -177,39 +232,51 @@ impl Settings {
     /// Fills the given settings.json text buffer with some initial contents for convenience.
     pub fn bootstrap(tb: &mut TextBuffer) {
         tb.set_crlf(false);
-        tb.write_raw(
-            concat!(
-                "{\n",
-                "    // Color theme. One of: \"system\" (follow the terminal palette),\n",
-                "    // \"catppuccin-latte\", \"catppuccin-frappe\", \"catppuccin-macchiato\",\n",
-                "    // \"catppuccin-mocha\".\n",
-                "    // \"theme\": \"system\",\n",
-                "\n",
-                "    // Maps file name globs to language IDs for syntax highlighting.\n",
-                "    // The default is empty (associations are inferred automatically).\n",
-                "    // \"files.associations\": {\n",
-                "    //     \"*.txt\": \"plaintext\"\n",
-                "    // },\n",
-                "\n",
-                "    // On save, trim trailing whitespace from every line. Default: true.\n",
-                "    // \"files.trimTrailingWhitespace\": true,\n",
-                "\n",
-                "    // On save, ensure the file ends with exactly one newline. Default: true.\n",
-                "    // \"files.insertFinalNewline\": true,\n",
-                "\n",
-                "    // User-defined shell commands, runnable from the \"Command\" menu.\n",
-                "    // \"key\" is optional and accepts things like \"F5\" or \"Ctrl+Shift+B\".\n",
-                "    // \"$FILE\" in \"command\" is replaced with the current file's path.\n",
-                "    // \"commands\": [\n",
-                "    //     { \"name\": \"Build\", \"command\": \"cargo build\", \"key\": \"F5\" },\n",
-                "    //     { \"name\": \"Run gofmt on file\", \"command\": \"gofmt -w $FILE\" }\n",
-                "    // ]\n",
-                "}\n",
-            )
-            .as_bytes(),
-        );
+        tb.write_raw(SETTINGS_HEADER);
+        for (i, &(_, block)) in SETTINGS_TEMPLATE_BLOCKS.iter().enumerate() {
+            if i > 0 {
+                tb.write_raw(b"\n");
+            }
+            tb.write_raw(block);
+        }
+        tb.write_raw(SETTINGS_FOOTER);
         tb.cursor_move_to_logical(Default::default());
         tb.mark_as_clean();
+    }
+
+    /// Appends commented template blocks for any known settings that are not
+    /// already present in the settings file.
+    pub fn ensure_template_blocks(tb: &mut TextBuffer) {
+        if tb.text_length() == 0 {
+            Self::bootstrap(tb);
+            return;
+        }
+
+        let text = text_buffer_bytes(tb);
+        let mut missing = SETTINGS_TEMPLATE_BLOCKS
+            .iter()
+            .filter_map(|&(marker, block)| (!byte_contains(&text, marker)).then_some(block))
+            .peekable();
+
+        if missing.peek().is_none() {
+            return;
+        }
+
+        let insert_at = text
+            .iter()
+            .rposition(|b| !b.is_ascii_whitespace())
+            .filter(|&pos| text[pos] == b'}')
+            .unwrap_or(text.len());
+
+        tb.cursor_move_to_offset(insert_at);
+        let needs_leading_newline = insert_at > 0 && text[insert_at - 1] != b'\n';
+        if needs_leading_newline {
+            tb.write_raw(b"\n");
+        }
+        for block in missing {
+            tb.write_raw(b"\n");
+            tb.write_raw(block);
+        }
     }
 
     const fn new() -> Self {
@@ -346,6 +413,24 @@ impl Settings {
 
         Ok(())
     }
+}
+
+fn text_buffer_bytes(tb: &TextBuffer) -> Vec<u8> {
+    let mut text = Vec::with_capacity(tb.text_length());
+    let mut off = 0;
+    while off < tb.text_length() {
+        let chunk = tb.read_forward(off);
+        if chunk.is_empty() {
+            break;
+        }
+        text.extend_from_slice(chunk);
+        off += chunk.len();
+    }
+    text
+}
+
+fn byte_contains(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack.windows(needle.len()).any(|w| w == needle)
 }
 
 fn settings_json_path() -> Option<PathBuf> {
