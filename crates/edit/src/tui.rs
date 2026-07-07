@@ -2679,6 +2679,7 @@ impl<'a> Context<'a, '_> {
                             }
                         }
                         kbmod::ALT => tb.move_selected_lines(MoveLineDirection::Down),
+                        kbmod::ALT_SHIFT => tb.duplicate_lines(),
                         kbmod::CTRL_ALT => {
                             // TODO: Add cursor above
                         }
@@ -2717,6 +2718,22 @@ impl<'a> Context<'a, '_> {
                 },
                 vk::H => match modifiers {
                     kbmod::CTRL => tb.delete(CursorMovement::Word, -1),
+                    _ => return false,
+                },
+                vk::D => match modifiers {
+                    kbmod::CTRL if !single_line => tb.duplicate_lines(),
+                    _ => return false,
+                },
+                vk::K => match modifiers {
+                    kbmod::CTRL_SHIFT if !single_line => tb.delete_lines(),
+                    _ => return false,
+                },
+                vk::SLASH => match modifiers {
+                    kbmod::CTRL if !single_line => {
+                        if let Some(token) = tb.language().and_then(crate::lsh::line_comment_token) {
+                            tb.toggle_line_comment(token);
+                        }
+                    }
                     _ => return false,
                 },
                 vk::L => match modifiers {
@@ -3145,10 +3162,19 @@ impl<'a> Context<'a, '_> {
 
         // If the list has focus, we also delegate focus to the selected item and colorize it.
         if contains_focus {
+            let fg = self.contrasted(self.indexed(IndexedColor::Green));
             {
                 let mut node = selected_next.borrow_mut();
                 node.attributes.bg = self.indexed(IndexedColor::Green);
-                node.attributes.fg = self.contrasted(self.indexed(IndexedColor::Green));
+                node.attributes.fg = fg;
+            }
+            // Styled labels carry per-chunk foreground colors that would otherwise
+            // blend on top of the highlight and wash out against it. Override them
+            // so the selected row uses the high-contrast foreground throughout.
+            if let NodeContent::Text(content) = &mut selected_next.borrow_mut().content {
+                for chunk in content.chunks.as_mut_slice() {
+                    chunk.fg = fg;
+                }
             }
             self.steal_focus_for(selected_next);
         }

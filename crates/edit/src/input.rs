@@ -161,6 +161,10 @@ pub mod vk {
     pub const Y: InputKey = InputKey::new('Y' as u32);
     pub const Z: InputKey = InputKey::new('Z' as u32);
 
+    // Punctuation keys are delivered as their ASCII codepoint (not a Windows VK
+    // code), matching how the VT input parser reports printable keys.
+    pub const SLASH: InputKey = InputKey::new('/' as u32);
+
     pub const NUMPAD0: InputKey = InputKey::new(0x60);
     pub const NUMPAD1: InputKey = InputKey::new(0x61);
     pub const NUMPAD2: InputKey = InputKey::new(0x62);
@@ -220,6 +224,8 @@ pub mod kbmod {
     pub const CTRL_SHIFT: InputKeyMod = InputKeyMod::new(0x05000000);
     pub const ALT_SHIFT: InputKeyMod = InputKeyMod::new(0x06000000);
     pub const CTRL_ALT_SHIFT: InputKeyMod = InputKeyMod::new(0x07000000);
+    /// Super (Windows/Command) + Shift, e.g. macOS Cmd+Shift+F.
+    pub const SUPER_SHIFT: InputKeyMod = InputKeyMod::new(0x0C000000);
 }
 
 /// Mouse input state. Up/Down, Left/Right, etc.
@@ -344,6 +350,9 @@ impl<'input> Iterator for Stream<'_, '_, 'input> {
                         return Some(Input::Keyboard(kbmod::CTRL | InputKey::new(key)));
                     }
                     '\x7f' => return Some(Input::Keyboard(vk::BACK)),
+                    // Legacy terminals emit US (0x1F) for Ctrl+/ (and Ctrl+_).
+                    // Report it as Ctrl+/ so "Toggle line comment" works.
+                    '\x1f' => return Some(Input::Keyboard(kbmod::CTRL | vk::SLASH)),
                     _ => {}
                 },
                 vt::Token::Esc(ch) => {
