@@ -238,22 +238,41 @@ impl Framebuffer {
         self.background_fill = StraightRgba::zero();
         self.foreground_fill = StraightRgba::zero();
 
-        self.auto_colors = [
-            self.indexed_colors[IndexedColor::Black as usize],
-            self.indexed_colors[IndexedColor::BrightWhite as usize],
-        ];
-
         // It's not guaranteed that Black is actually dark and BrightWhite light (vice versa for a light theme).
         // Such is the case with macOS 26's "Clear Dark" theme (and probably a lot other themes).
         // Its black is #35424C (l=0.3716; oof!) and bright white is #E5EFF5 (l=0.9464).
-        // If we have a color such as #43698A (l=0.5065), which is l>0.5 ("light") and need a contrasting color,
-        // we need that to be #E5EFF5, even though that's also l>0.5. With a midpoint of 0.659, we get that right.
-        let lightness = self.auto_colors.map(|c| c.as_oklab().lightness());
-        self.auto_color_threshold = (lightness[0] + lightness[1]) * 0.5;
+        // Worse, palettes like Catppuccin Latte map Black/BrightWhite to mid-tone surface
+        // colors (#BCC0CC/#6C6F85), which make for terrible contrast pairs. Background and
+        // Foreground are the actual extremes there, so consider all four and pick the
+        // darkest and lightest.
+        let candidates = [
+            IndexedColor::Black,
+            IndexedColor::BrightWhite,
+            IndexedColor::Background,
+            IndexedColor::Foreground,
+        ]
+        .map(|i| self.indexed_colors[i as usize]);
+        let lightness = candidates.map(|c| c.as_oklab().lightness());
+        let mut darkest = 0;
+        let mut lightest = 0;
+        for i in 1..candidates.len() {
+            if lightness[i] < lightness[darkest] {
+                darkest = i;
+            }
+            if lightness[i] > lightness[lightest] {
+                lightest = i;
+            }
+        }
+        self.auto_colors = [candidates[darkest], candidates[lightest]];
 
-        // Ensure [0] is dark and [1] is light.
-        if lightness[0] > lightness[1] {
-            self.auto_colors.swap(0, 1);
+        // If we have a color such as #43698A (l=0.5065), which is l>0.5 ("light") and need a
+        // contrasting color in "Clear Dark", we need that to be #E5EFF5, even though that's
+        // also l>0.5. With a midpoint threshold we get that right.
+        self.auto_color_threshold = (lightness[darkest] + lightness[lightest]) * 0.5;
+
+        // The cached contrasts were computed against the previous palette.
+        for slot in &self.contrast_colors {
+            slot.set((StraightRgba::zero(), self.auto_colors[1]));
         }
     }
 

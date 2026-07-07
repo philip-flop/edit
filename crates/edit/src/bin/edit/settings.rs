@@ -395,6 +395,8 @@ impl Settings {
                 return Err(apperr::Error::SettingsInvalid("developer.mode"));
             };
             self.developer_mode = b;
+        }
+
         if let Some(value) = root.get("fileBrowser.showAtStartup") {
             let Some(b) = value.as_bool() else {
                 return Err(apperr::Error::SettingsInvalid("fileBrowser.showAtStartup"));
