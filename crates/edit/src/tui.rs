@@ -3145,10 +3145,19 @@ impl<'a> Context<'a, '_> {
 
         // If the list has focus, we also delegate focus to the selected item and colorize it.
         if contains_focus {
+            let fg = self.contrasted(self.indexed(IndexedColor::Green));
             {
                 let mut node = selected_next.borrow_mut();
                 node.attributes.bg = self.indexed(IndexedColor::Green);
-                node.attributes.fg = self.contrasted(self.indexed(IndexedColor::Green));
+                node.attributes.fg = fg;
+            }
+            // Styled labels carry per-chunk foreground colors that would otherwise
+            // blend on top of the highlight and wash out against it. Override them
+            // so the selected row uses the high-contrast foreground throughout.
+            if let NodeContent::Text(content) = &mut selected_next.borrow_mut().content {
+                for chunk in content.chunks.as_mut_slice() {
+                    chunk.fg = fg;
+                }
             }
             self.steal_focus_for(selected_next);
         }
