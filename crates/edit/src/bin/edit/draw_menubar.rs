@@ -7,7 +7,7 @@ use edit::tui::*;
 use stdext::arena_format;
 
 use crate::localization::*;
-use crate::settings::Settings;
+use crate::settings::{CommandSpec, Settings};
 use crate::state::*;
 
 pub fn draw_menubar(ctx: &mut Context, state: &mut State) {
@@ -30,6 +30,11 @@ pub fn draw_menubar(ctx: &mut Context, state: &mut State) {
             if ctx.menubar_menu_begin(loc(LocId::View), 'V') {
                 draw_menu_view(ctx, state);
             }
+        }
+        if !Settings::borrow().commands.is_empty()
+            && ctx.menubar_menu_begin(loc(LocId::Command), 'C')
+        {
+            draw_menu_command(ctx, state);
         }
         if ctx.menubar_menu_begin(loc(LocId::Help), 'H') {
             draw_menu_help(ctx, state);
@@ -154,6 +159,18 @@ fn draw_menu_view(ctx: &mut Context, state: &mut State) {
         ctx.needs_rerender();
     }
 
+    ctx.menubar_menu_end();
+}
+
+fn draw_menu_command(ctx: &mut Context, state: &mut State) {
+    let commands: Vec<CommandSpec> = Settings::borrow().commands.clone();
+    for (i, spec) in commands.iter().enumerate() {
+        ctx.next_block_id_mixin(i as u64);
+        let shortcut = spec.key.unwrap_or(vk::NULL);
+        if ctx.menubar_menu_button(&spec.name, '\0', shortcut) {
+            run_command(ctx, state, spec);
+        }
+    }
     ctx.menubar_menu_end();
 }
 

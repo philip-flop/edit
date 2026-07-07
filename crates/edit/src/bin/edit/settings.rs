@@ -8,6 +8,7 @@ use edit::framebuffer::{
     CATPPUCCIN_FRAPPE, CATPPUCCIN_LATTE, CATPPUCCIN_MACCHIATO, CATPPUCCIN_MOCHA,
     INDEXED_COLORS_COUNT,
 };
+use edit::input::{InputKey, kbmod, vk};
 use edit::json;
 use edit::lsh::{LANGUAGES, Language};
 use edit::oklab::StraightRgba;
@@ -15,6 +16,106 @@ use stdext::arena::{read_to_string, scratch_arena};
 use stdext::arena_format;
 
 use crate::apperr;
+
+/// A user-defined shell command, configured via the `commands` array in
+/// settings.json and exposed through the "Command" menu (and, optionally,
+/// a keybinding).
+#[derive(Clone)]
+pub struct CommandSpec {
+    pub name: String,
+    pub command: String,
+    pub key: Option<InputKey>,
+}
+
+/// Parses a simple `Ctrl+Alt+Shift+<key>` shortcut description, as used by
+/// the `key` field of a `commands` entry in settings.json.
+fn parse_shortcut(s: &str) -> Option<InputKey> {
+    let mut parts = s.split('+').collect::<Vec<_>>();
+    let key = parts.pop()?;
+    if key.is_empty() {
+        return None;
+    }
+
+    let mut modifiers = kbmod::NONE;
+    for m in parts {
+        modifiers |= match m.to_ascii_lowercase().as_str() {
+            "ctrl" | "control" => kbmod::CTRL,
+            "alt" => kbmod::ALT,
+            "shift" => kbmod::SHIFT,
+            "super" | "cmd" | "command" | "win" => kbmod::SUPER,
+            _ => return None,
+        };
+    }
+
+    let base = match key.to_ascii_uppercase().as_str() {
+        "F1" => vk::F1,
+        "F2" => vk::F2,
+        "F3" => vk::F3,
+        "F4" => vk::F4,
+        "F5" => vk::F5,
+        "F6" => vk::F6,
+        "F7" => vk::F7,
+        "F8" => vk::F8,
+        "F9" => vk::F9,
+        "F10" => vk::F10,
+        "F11" => vk::F11,
+        "F12" => vk::F12,
+        "TAB" => vk::TAB,
+        "ESC" | "ESCAPE" => vk::ESCAPE,
+        "ENTER" | "RETURN" => vk::RETURN,
+        "SPACE" => vk::SPACE,
+        "BACKSPACE" | "BACK" => vk::BACK,
+        "DELETE" | "DEL" => vk::DELETE,
+        "INSERT" | "INS" => vk::INSERT,
+        "HOME" => vk::HOME,
+        "END" => vk::END,
+        "UP" => vk::UP,
+        "DOWN" => vk::DOWN,
+        "LEFT" => vk::LEFT,
+        "RIGHT" => vk::RIGHT,
+        "PAGEUP" | "PRIOR" => vk::PRIOR,
+        "PAGEDOWN" | "NEXT" => vk::NEXT,
+        "0" => vk::N0,
+        "1" => vk::N1,
+        "2" => vk::N2,
+        "3" => vk::N3,
+        "4" => vk::N4,
+        "5" => vk::N5,
+        "6" => vk::N6,
+        "7" => vk::N7,
+        "8" => vk::N8,
+        "9" => vk::N9,
+        "A" => vk::A,
+        "B" => vk::B,
+        "C" => vk::C,
+        "D" => vk::D,
+        "E" => vk::E,
+        "F" => vk::F,
+        "G" => vk::G,
+        "H" => vk::H,
+        "I" => vk::I,
+        "J" => vk::J,
+        "K" => vk::K,
+        "L" => vk::L,
+        "M" => vk::M,
+        "N" => vk::N,
+        "O" => vk::O,
+        "P" => vk::P,
+        "Q" => vk::Q,
+        "R" => vk::R,
+        "S" => vk::S,
+        "T" => vk::T,
+        "U" => vk::U,
+        "V" => vk::V,
+        "W" => vk::W,
+        "X" => vk::X,
+        "Y" => vk::Y,
+        "Z" => vk::Z,
+        _ => return None,
+    };
+
+    Some(base | modifiers)
+}
 
 /// The color theme to use for the editor.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -57,6 +158,7 @@ pub struct Settings {
     pub path: PathBuf,
     pub file_associations: Vec<(String, &'static Language)>,
     pub theme: Theme,
+    pub commands: Vec<CommandSpec>,
 }
 
 struct SettingsCell(SemiRefCell<Settings>);
@@ -84,6 +186,14 @@ impl Settings {
                 "    // \"files.associations\": {\n",
                 "    //     \"*.txt\": \"plaintext\"\n",
                 "    // }\n",
+                "\n",
+                "    // User-defined shell commands, runnable from the \"Command\" menu.\n",
+                "    // \"key\" is optional and accepts things like \"F5\" or \"Ctrl+Shift+B\".\n",
+                "    // \"$FILE\" in \"command\" is replaced with the current file's path.\n",
+                "    // \"commands\": [\n",
+                "    //     { \"name\": \"Build\", \"command\": \"cargo build\", \"key\": \"F5\" },\n",
+                "    //     { \"name\": \"Run gofmt on file\", \"command\": \"gofmt -w $FILE\" }\n",
+                "    // ]\n",
                 "}\n",
             )
             .as_bytes(),
@@ -93,7 +203,12 @@ impl Settings {
     }
 
     const fn new() -> Self {
-        Settings { path: PathBuf::new(), file_associations: Vec::new(), theme: Theme::System }
+        Settings {
+            path: PathBuf::new(),
+            file_associations: Vec::new(),
+            theme: Theme::System,
+            commands: Vec::new(),
+        }
     }
 
     pub fn borrow() -> Ref<'static, Settings> {
@@ -171,6 +286,35 @@ impl Settings {
                 };
 
                 self.file_associations.push((key.to_string(), language));
+            }
+        }
+
+        if let Some(arr) = root.get_array("commands") {
+            for item in arr {
+                let Some(obj) = item.as_object() else {
+                    return Err(apperr::Error::SettingsInvalid("commands"));
+                };
+
+                let Some(name) = obj.get_str("name") else {
+                    return Err(apperr::Error::SettingsInvalid("commands"));
+                };
+                let Some(command) = obj.get_str("command") else {
+                    return Err(apperr::Error::SettingsInvalid("commands"));
+                };
+
+                let key = match obj.get_str("key") {
+                    Some(k) => match parse_shortcut(k) {
+                        Some(key) => Some(key),
+                        None => return Err(apperr::Error::SettingsInvalid("commands.key")),
+                    },
+                    None => None,
+                };
+
+                self.commands.push(CommandSpec {
+                    name: name.to_string(),
+                    command: command.to_string(),
+                    key,
+                });
             }
         }
 

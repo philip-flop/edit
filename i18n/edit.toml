@@ -977,6 +977,10 @@ zh-hans = "转到文件…"
 zh-hant = "跳至檔案…"
 
 # A menu bar item
+[Command]
+en = "Command"
+
+# A menu bar item
 [Help]
 en = "Help"
 ar = "مساعدة"
