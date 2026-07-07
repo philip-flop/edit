@@ -31,7 +31,12 @@ impl Document {
         let mut file = DocumentManager::open_for_writing(path)?;
 
         {
+            let (trim, final_nl) = {
+                let s = Settings::borrow();
+                (s.trim_trailing_whitespace, s.insert_final_newline)
+            };
             let mut tb = self.buffer.borrow_mut();
+            tb.sanitize_whitespace(trim, final_nl);
             tb.write_file(&mut file)?;
         }
 

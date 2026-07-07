@@ -966,6 +966,110 @@ impl TextBuffer {
     }
 
     /// Writes the text buffer contents to a file, handling BOM and encoding.
+    /// Cleans up whitespace prior to saving:
+    /// - When `trim_trailing` is set, trailing spaces/tabs are stripped from every line.
+    /// - When `ensure_final_newline` is set, the file is made to end with exactly
+    ///   one newline (trailing blank lines are collapsed into a single newline).
+    ///
+    /// The whole operation is a single undo step and the cursor position is
+    /// preserved as closely as possible.
+    pub fn sanitize_whitespace(&mut self, trim_trailing: bool, ensure_final_newline: bool) {
+        if !trim_trailing && !ensure_final_newline {
+            return;
+        }
+
+        // Read the entire buffer out so we can compute the cleaned version.
+        let mut text = Vec::new();
+        {
+            let mut offset = 0;
+            loop {
+                let chunk = self.read_forward(offset);
+                if chunk.is_empty() {
+                    break;
+                }
+                text.extend_from_slice(chunk);
+                offset += chunk.len();
+            }
+        }
+        if text.is_empty() {
+            return;
+        }
+
+        let crlf = self.newlines_are_crlf;
+        let nl: &[u8] = if crlf { b"\r\n" } else { b"\n" };
+
+        // Split into lines, dropping the newline sequences.
+        let mut lines: Vec<&[u8]> = Vec::new();
+        {
+            let mut start = 0;
+            let mut i = 0;
+            while i < text.len() {
+                if text[i] == b'\n' {
+                    let mut end = i;
+                    if end > start && text[end - 1] == b'\r' {
+                        end -= 1;
+                    }
+                    lines.push(&text[start..end]);
+                    start = i + 1;
+                }
+                i += 1;
+            }
+            // Trailing text without a newline is a final line of its own.
+            if start < text.len() {
+                lines.push(&text[start..]);
+            } else if start == text.len() {
+                // The buffer ended with a newline: represent the empty final line.
+                lines.push(&text[start..]);
+            }
+        }
+
+        let mut out: Vec<u8> = Vec::with_capacity(text.len());
+        for (idx, line) in lines.iter().enumerate() {
+            let trimmed: &[u8] = if trim_trailing {
+                let mut end = line.len();
+                while end > 0 && (line[end - 1] == b' ' || line[end - 1] == b'\t') {
+                    end -= 1;
+                }
+                &line[..end]
+            } else {
+                line
+            };
+            out.extend_from_slice(trimmed);
+            if idx + 1 < lines.len() {
+                out.extend_from_slice(nl);
+            }
+        }
+
+        if ensure_final_newline {
+            // Collapse any trailing blank lines and guarantee exactly one newline.
+            while out.ends_with(b"\n") || out.ends_with(b"\r") {
+                out.pop();
+            }
+            if !out.is_empty() {
+                out.extend_from_slice(nl);
+            }
+        }
+
+        if out == text {
+            return; // Nothing changed; avoid dirtying the undo stack.
+        }
+
+        // Remember the cursor's logical position so we can restore it afterwards.
+        let cursor_before = self.cursor.logical_pos;
+
+        self.edit_begin_grouping();
+        {
+            self.set_selection(None);
+            self.select_all();
+            // Replacing the whole selection with the cleaned text is a single edit.
+            self.write_raw(&out);
+        }
+        self.edit_end_grouping();
+
+        // Restore the cursor near where it was. Clamp happens inside the move.
+        self.cursor_move_to_logical(cursor_before);
+    }
+
     pub fn write_file(&mut self, file: &mut File) -> IoResult<()> {
         let mut offset = 0;
 
@@ -2701,6 +2805,220 @@ impl TextBuffer {
         }));
     }
 
+    /// Returns the logical line range `[beg, end]` (inclusive) that the current
+    /// selection spans, or the cursor's line if there's no selection.
+    fn selected_line_range(&self) -> [CoordType; 2] {
+        match self.selection {
+            Some(s) => minmax(s.beg.y, s.end.y),
+            None => [self.cursor.logical_pos.y, self.cursor.logical_pos.y],
+        }
+    }
+
+    /// Returns the byte range `start..stop` covering the logical lines
+    /// `[beg, end]` (inclusive), along with a flag indicating whether the block
+    /// is terminated by a trailing newline (i.e. it isn't the last line of a
+    /// buffer that lacks a final newline).
+    fn line_block_range(&self, beg: CoordType, end: CoordType) -> (usize, usize, bool) {
+        let last_line = self.cursor_move_to_logical_internal(self.cursor, Point::MAX).logical_pos.y;
+        let start = self.goto_line_start(self.cursor, beg).offset;
+        if end < last_line {
+            // There's at least one more line after the block, so `goto_line_start`
+            // can reliably reach the start of the following line.
+            let stop = self.goto_line_start(self.cursor, end + 1).offset;
+            (start, stop, true)
+        } else {
+            // The block extends to the end of the buffer, which has no trailing
+            // newline. Use the true end-of-buffer offset.
+            let stop = self.cursor_move_to_logical_internal(self.cursor, Point::MAX).offset;
+            (start, stop, false)
+        }
+    }
+
+    /// Returns the newline sequence used by this buffer.
+    fn newline_bytes(&self) -> &'static [u8] {
+        if self.newlines_are_crlf { b"\r\n" } else { b"\n" }
+    }
+
+    /// Duplicates the current line, or all lines spanned by the selection.
+    /// The copy is inserted directly below the original block and the cursor
+    /// (and selection) are moved down onto the copy. Single undo step.
+    pub fn duplicate_lines(&mut self) {
+        let selection = self.selection;
+        let cursor = self.cursor;
+        let [beg, end] = self.selected_line_range();
+
+        // Grab the raw text of the block of lines.
+        let (start, stop, has_newline) = self.line_block_range(beg, end);
+        let mut text = Vec::new();
+        self.buffer.extract_raw(start..stop, &mut text, 0);
+        if text.is_empty() {
+            return;
+        }
+
+        let count = end - beg + 1;
+
+        self.edit_begin_grouping();
+        {
+            self.set_selection(None);
+            // Insert the copy at the end of the block. If the block is at the end
+            // of the buffer and lacks a trailing newline, prepend one so the copy
+            // starts on its own line.
+            self.cursor_move_to_offset(stop);
+            if has_newline {
+                self.write_raw(&text);
+            } else {
+                let mut buf = self.newline_bytes().to_vec();
+                buf.extend_from_slice(&text);
+                self.write_raw(&buf);
+            }
+        }
+        self.edit_end_grouping();
+
+        // Move the cursor/selection down onto the freshly inserted copy.
+        self.cursor_move_to_logical(Point {
+            x: cursor.logical_pos.x,
+            y: cursor.logical_pos.y + count,
+        });
+        self.set_selection(selection.map(|mut s| {
+            s.beg.y += count;
+            s.end.y += count;
+            s
+        }));
+    }
+
+    /// Deletes the current line, or all lines spanned by the selection.
+    /// Single undo step.
+    pub fn delete_lines(&mut self) {
+        let [beg, end] = self.selected_line_range();
+
+        let (start, stop, has_newline) = self.line_block_range(beg, end);
+
+        // Determine the range to remove. In the normal case there's a following
+        // line and we delete `start..stop` (which includes the trailing newline).
+        // If the block reaches the end of the buffer without a trailing newline,
+        // we also consume the newline *before* the block so we don't leave a
+        // dangling empty line behind.
+        let del_beg_off = if has_newline || beg <= 0 {
+            start
+        } else {
+            self.cursor_move_to_logical_internal(self.cursor, Point { x: CoordType::MAX, y: beg - 1 })
+                .offset
+        };
+
+        if stop <= del_beg_off {
+            return;
+        }
+
+        let del_beg = self.cursor_move_to_offset_internal(self.cursor, del_beg_off);
+        let del_end = self.cursor_move_to_offset_internal(del_beg, stop);
+
+        self.set_selection(None);
+        self.edit_begin_grouping();
+        {
+            self.edit_begin(HistoryType::Delete, del_beg);
+            self.edit_delete(del_end);
+            self.edit_end();
+        }
+        self.edit_end_grouping();
+
+        // Land the cursor at the start of the line that took the deleted block's place.
+        self.cursor_move_to_logical(Point { x: 0, y: self.cursor.logical_pos.y });
+    }
+
+    /// Toggles a line comment using `token` (e.g. `//` or `#`) for the current
+    /// line or all lines spanned by the selection. If every non-blank line in
+    /// the range is already commented, they are uncommented; otherwise they are
+    /// commented. Single undo step.
+    pub fn toggle_line_comment(&mut self, token: &str) {
+        if token.is_empty() {
+            return;
+        }
+
+        let selection = self.selection;
+        let cursor = self.cursor;
+        let [beg, end] = self.selected_line_range();
+        let token_bytes = token.as_bytes();
+
+        // First pass: decide whether to comment or uncomment. We uncomment only
+        // if every non-blank line already begins (after indentation) with the token.
+        let mut any_non_blank = false;
+        let mut all_commented = true;
+        for y in beg..=end {
+            let ls = self.goto_line_start(self.cursor, y);
+            let le = self.cursor_move_to_logical_internal(ls, Point { x: CoordType::MAX, y });
+            let mut line = Vec::new();
+            self.buffer.extract_raw(ls.offset..le.offset, &mut line, 0);
+            let indent = line.iter().take_while(|&&b| b == b' ' || b == b'\t').count();
+            if indent >= line.len() {
+                continue; // blank line
+            }
+            any_non_blank = true;
+            if !line[indent..].starts_with(token_bytes) {
+                all_commented = false;
+            }
+        }
+        if !any_non_blank {
+            return;
+        }
+
+        let uncomment = all_commented;
+        // Track how the cursor's own line shifts so we can preserve its column.
+        let mut cursor_delta: CoordType = 0;
+
+        self.edit_begin_grouping();
+        {
+            self.set_selection(None);
+            for y in beg..=end {
+                let ls = self.goto_line_start(self.cursor, y);
+                let le = self.cursor_move_to_logical_internal(ls, Point { x: CoordType::MAX, y });
+                let mut line = Vec::new();
+                self.buffer.extract_raw(ls.offset..le.offset, &mut line, 0);
+                let indent = line.iter().take_while(|&&b| b == b' ' || b == b'\t').count();
+                if indent >= line.len() {
+                    continue; // don't touch blank lines
+                }
+                let at = ls.offset + indent;
+
+                if uncomment {
+                    if !line[indent..].starts_with(token_bytes) {
+                        continue;
+                    }
+                    // Remove the token and up to one following space.
+                    let mut remove = token_bytes.len();
+                    if line.get(indent + remove) == Some(&b' ') {
+                        remove += 1;
+                    }
+                    let del_beg = self.cursor_move_to_offset_internal(self.cursor, at);
+                    let del_end = self.cursor_move_to_offset_internal(del_beg, at + remove);
+                    self.edit_begin(HistoryType::Delete, del_beg);
+                    self.edit_delete(del_end);
+                    self.edit_end();
+                    if y == cursor.logical_pos.y {
+                        cursor_delta -= remove as CoordType;
+                    }
+                } else {
+                    // Insert "<token> " at the first non-whitespace column.
+                    let mut ins = token_bytes.to_vec();
+                    ins.push(b' ');
+                    self.cursor_move_to_offset(at);
+                    self.write_raw(&ins);
+                    if y == cursor.logical_pos.y {
+                        cursor_delta += ins.len() as CoordType;
+                    }
+                }
+            }
+        }
+        self.edit_end_grouping();
+
+        // Restore the cursor near its original position and the selection over
+        // the same range of lines.
+        self.cursor_move_to_logical(Point {
+            x: (cursor.logical_pos.x + cursor_delta).max(0),
+            y: cursor.logical_pos.y,
+        });
+        self.set_selection(selection);
+    }
+
     /// Extracts the contents of the current selection.
     /// May optionally delete it, if requested. This is meant to be used for Ctrl+X.
     fn extract_selection(&mut self, delete: bool) -> Vec<u8> {
@@ -3135,12 +3453,168 @@ fn detect_bom(bytes: &[u8]) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{SearchOptions, TextBuffer};
+    use super::{CoordType, MoveLineDirection, Point, SearchOptions, TextBuffer};
 
     fn buffer_contents(buf: &mut TextBuffer) -> String {
         let mut str = String::new();
         buf.save_as_string(&mut str);
         str
+    }
+
+    fn new_buffer(text: &[u8]) -> TextBuffer {
+        let mut buf = TextBuffer::new(false).unwrap();
+        buf.set_crlf(false);
+        buf.write_raw(text);
+        buf.cursor_move_to_logical(Point { x: 0, y: 0 });
+        buf
+    }
+
+    #[test]
+    fn duplicate_single_line() {
+        let mut buf = new_buffer(b"one\ntwo\nthree\n");
+        buf.cursor_move_to_logical(Point { x: 1, y: 1 });
+        buf.duplicate_lines();
+        assert_eq!(buffer_contents(&mut buf), "one\ntwo\ntwo\nthree\n");
+        // Cursor should have moved down onto the duplicate copy.
+        assert_eq!(buf.cursor_logical_pos(), Point { x: 1, y: 2 });
+    }
+
+    #[test]
+    fn duplicate_last_line_without_newline() {
+        let mut buf = new_buffer(b"a\nb");
+        buf.cursor_move_to_logical(Point { x: 0, y: 1 });
+        buf.duplicate_lines();
+        assert_eq!(buffer_contents(&mut buf), "a\nb\nb");
+    }
+
+    #[test]
+    fn duplicate_selection_range() {
+        let mut buf = new_buffer(b"one\ntwo\nthree\nfour\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 1 });
+        // Select through the end of line 2 ("three") so the block is lines 1..=2.
+        buf.selection_update_logical(Point { x: CoordType::MAX, y: 2 });
+        buf.duplicate_lines();
+        assert_eq!(buffer_contents(&mut buf), "one\ntwo\nthree\ntwo\nthree\nfour\n");
+    }
+
+    #[test]
+    fn duplicate_is_single_undo_step() {
+        let mut buf = new_buffer(b"one\ntwo\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 0 });
+        buf.duplicate_lines();
+        assert_eq!(buffer_contents(&mut buf), "one\none\ntwo\n");
+        buf.undo();
+        assert_eq!(buffer_contents(&mut buf), "one\ntwo\n");
+    }
+
+    #[test]
+    fn delete_single_line() {
+        let mut buf = new_buffer(b"one\ntwo\nthree\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 1 });
+        buf.delete_lines();
+        assert_eq!(buffer_contents(&mut buf), "one\nthree\n");
+    }
+
+    #[test]
+    fn delete_last_line_without_newline() {
+        let mut buf = new_buffer(b"one\ntwo");
+        buf.cursor_move_to_logical(Point { x: 0, y: 1 });
+        buf.delete_lines();
+        // Removing the final line also consumes the newline that preceded it,
+        // so no dangling empty line is left behind.
+        assert_eq!(buffer_contents(&mut buf), "one");
+    }
+
+    #[test]
+    fn delete_selection_range() {
+        let mut buf = new_buffer(b"one\ntwo\nthree\nfour\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 1 });
+        buf.selection_update_logical(Point { x: 0, y: 2 });
+        buf.delete_lines();
+        assert_eq!(buffer_contents(&mut buf), "one\nfour\n");
+    }
+
+    #[test]
+    fn delete_is_single_undo_step() {
+        let mut buf = new_buffer(b"one\ntwo\nthree\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 1 });
+        buf.delete_lines();
+        assert_eq!(buffer_contents(&mut buf), "one\nthree\n");
+        buf.undo();
+        assert_eq!(buffer_contents(&mut buf), "one\ntwo\nthree\n");
+    }
+
+    #[test]
+    fn move_line_down_and_up() {
+        let mut buf = new_buffer(b"one\ntwo\nthree\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 0 });
+        buf.move_selected_lines(MoveLineDirection::Down);
+        assert_eq!(buffer_contents(&mut buf), "two\none\nthree\n");
+        buf.move_selected_lines(MoveLineDirection::Up);
+        assert_eq!(buffer_contents(&mut buf), "one\ntwo\nthree\n");
+    }
+
+    #[test]
+    fn toggle_comment_add_and_remove() {
+        let mut buf = new_buffer(b"    foo\nbar\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 0 });
+        buf.selection_update_logical(Point { x: 0, y: 2 });
+        // Comment both lines.
+        buf.toggle_line_comment("//");
+        assert_eq!(buffer_contents(&mut buf), "    // foo\n// bar\n");
+        // Toggling again removes the comments.
+        buf.cursor_move_to_logical(Point { x: 0, y: 0 });
+        buf.selection_update_logical(Point { x: 0, y: 2 });
+        buf.toggle_line_comment("//");
+        assert_eq!(buffer_contents(&mut buf), "    foo\nbar\n");
+    }
+
+    #[test]
+    fn toggle_comment_skips_blank_lines() {
+        let mut buf = new_buffer(b"foo\n\nbar\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 0 });
+        buf.selection_update_logical(Point { x: 0, y: 3 });
+        buf.toggle_line_comment("#");
+        assert_eq!(buffer_contents(&mut buf), "# foo\n\n# bar\n");
+    }
+
+    #[test]
+    fn toggle_comment_single_undo_step() {
+        let mut buf = new_buffer(b"a\nb\n");
+        buf.cursor_move_to_logical(Point { x: 0, y: 0 });
+        buf.selection_update_logical(Point { x: 0, y: 2 });
+        buf.toggle_line_comment("//");
+        assert_eq!(buffer_contents(&mut buf), "// a\n// b\n");
+        buf.undo();
+        assert_eq!(buffer_contents(&mut buf), "a\nb\n");
+    }
+
+    #[test]
+    fn sanitize_trims_trailing_whitespace() {
+        let mut buf = new_buffer(b"foo   \nbar\t\nbaz\n");
+        buf.sanitize_whitespace(true, false);
+        assert_eq!(buffer_contents(&mut buf), "foo\nbar\nbaz\n");
+    }
+
+    #[test]
+    fn sanitize_inserts_final_newline() {
+        let mut buf = new_buffer(b"foo\nbar");
+        buf.sanitize_whitespace(false, true);
+        assert_eq!(buffer_contents(&mut buf), "foo\nbar\n");
+    }
+
+    #[test]
+    fn sanitize_collapses_trailing_blank_lines() {
+        let mut buf = new_buffer(b"foo\n\n\n");
+        buf.sanitize_whitespace(true, true);
+        assert_eq!(buffer_contents(&mut buf), "foo\n");
+    }
+
+    #[test]
+    fn sanitize_noop_leaves_content() {
+        let mut buf = new_buffer(b"foo\nbar\n");
+        buf.sanitize_whitespace(true, true);
+        assert_eq!(buffer_contents(&mut buf), "foo\nbar\n");
     }
 
     #[test]

@@ -838,6 +838,21 @@ vi = "Chọn tất cả"
 zh-hans = "全选"
 zh-hant = "全選"
 
+[EditDuplicateLine]
+en = "Duplicate Line"
+
+[EditDeleteLine]
+en = "Delete Line"
+
+[EditMoveLineUp]
+en = "Move Line Up"
+
+[EditMoveLineDown]
+en = "Move Line Down"
+
+[EditToggleComment]
+en = "Toggle Comment"
+
 # A menu bar item
 [View]
 en = "View"
