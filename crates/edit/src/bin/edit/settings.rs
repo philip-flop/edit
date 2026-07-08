@@ -60,7 +60,7 @@ const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
     (
         b"\"fileBrowser.showAtStartup\"",
         concat!(
-            "    // Show the file browser at startup when the editor is wider than 80 columns. Default: false.\n",
+            "    // Show the file browser at startup. Default: false.\n",
             "    // \"fileBrowser.showAtStartup\": false,\n",
         )
         .as_bytes(),
