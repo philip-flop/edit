@@ -9,7 +9,8 @@ use edit::framebuffer::IndexedColor;
 use edit::helpers::*;
 use edit::input::{kbmod, vk};
 use edit::tui::*;
-use edit::{icu, path};
+use edit::{fuzzy, icu, path};
+use stdext::arena::scratch_arena;
 
 use crate::localization::*;
 use crate::state::*;
@@ -95,27 +96,65 @@ fn draw_file_pane(ctx: &mut Context, state: &mut State, content_height: CoordTyp
     {
         let contains_focus = ctx.contains_focus();
 
-        // Header: a right-aligned [X] button to close the pane, then the
-        // current directory.
-        if ctx.button("close", "X", ButtonStyle::default()) {
-            close_pane = true;
-        }
-        ctx.attr_position(Position::Right);
+        // Header: the current directory with the [X] close button inline.
+        ctx.table_begin("header");
+        // Fixed width for the directory so the [X] button always fits and
+        // sits flush against the pane's right edge:
+        // pane width minus the border (1), the cell gap (1), and "[X]" (3).
+        ctx.table_set_columns(&[FILE_PANE_WIDTH - 5, 0]);
+        ctx.table_set_cell_gap(Size { width: 1, height: 0 });
+        {
+            ctx.table_next_row();
 
-        ctx.label("dir", state.file_pane_dir.as_str());
-        ctx.attr_overflow(Overflow::TruncateMiddle);
+            ctx.label("dir", state.file_pane_dir.as_str());
+            ctx.attr_overflow(Overflow::TruncateMiddle);
+
+            if ctx.button("close", "X", ButtonStyle::default()) {
+                close_pane = true;
+            }
+        }
+        ctx.table_end();
+
+        // Fuzzy filter for the entries below. Folders also match if any file
+        // inside them (recursively) matches.
+        if ctx.editline("filter", &mut state.file_pane_filter) {
+            state.file_pane_filtered = None;
+            ctx.needs_rerender();
+        }
+        ctx.attr_border();
+        if ctx.is_focused() {
+            if !state.file_pane_filter.is_empty() && ctx.consume_shortcut(vk::ESCAPE) {
+                state.file_pane_filter.clear();
+                state.file_pane_filtered = None;
+                ctx.needs_rerender();
+            }
+            // Enter or Down moves focus into the filtered list.
+            if ctx.consume_shortcut(vk::RETURN) || ctx.consume_shortcut(vk::DOWN) {
+                state.file_pane_focus = true;
+            }
+        }
 
         if contains_focus && ctx.consume_shortcut(vk::ESCAPE) {
             state.wants_editor_focus = true;
         }
 
-        ctx.scrollarea_begin("file-pane-scroll", Size { width: 0, height: content_height - 4 });
+        if !state.file_pane_filter.is_empty() && state.file_pane_filtered.is_none() {
+            refresh_file_pane_filter(state);
+        }
+
+        ctx.scrollarea_begin("file-pane-scroll", Size { width: 0, height: content_height - 6 });
         {
             ctx.next_block_id_mixin(state.file_pane_dir_revision);
             ctx.list_begin("entries");
 
+            let entries = if state.file_pane_filter.is_empty() {
+                state.file_pane_entries.as_ref().unwrap()
+            } else {
+                state.file_pane_filtered.as_ref().unwrap()
+            };
+
             let mut first = true;
-            for entries in state.file_pane_entries.as_ref().unwrap() {
+            for entries in entries {
                 for entry in entries {
                     let sel = ctx.list_item(false, entry.as_str());
                     ctx.attr_overflow(Overflow::TruncateMiddle);
@@ -156,6 +195,7 @@ fn draw_file_pane(ctx: &mut Context, state: &mut State, content_height: CoordTyp
         state.file_pane_dir = DisplayablePathBuf::from_path(dir);
         state.file_pane_dir_revision = state.file_pane_dir_revision.wrapping_add(1);
         state.file_pane_entries = None;
+        state.file_pane_filter.clear();
         state.file_pane_focus = true;
         ctx.needs_rerender();
     } else if let Some(path) = open_file {
@@ -203,6 +243,64 @@ fn refresh_file_pane_entries(state: &mut State) {
     }
 
     state.file_pane_entries = Some(dirs_files);
+    state.file_pane_filtered = None;
+}
+
+/// Filters `state.file_pane_entries` by the fuzzy needle in
+/// `state.file_pane_filter`. A folder is also kept if any file inside it
+/// (recursively) matches, so you can find files nested in subdirectories.
+fn refresh_file_pane_filter(state: &mut State) {
+    let scratch = scratch_arena(None);
+    let needle = state.file_pane_filter.as_str();
+    let entries = state.file_pane_entries.as_ref().unwrap();
+    let mut filtered = [entries[0].clone(), Vec::new(), Vec::new()];
+
+    for (idx, group) in entries.iter().enumerate().skip(1) {
+        for entry in group {
+            let (score, _) = fuzzy::score_fuzzy(&scratch, entry.as_str(), needle, true);
+            let matched = score > 0
+                || (idx == 1
+                    && dir_contains_fuzzy_match(
+                        &state.file_pane_dir.as_path().join(entry.as_path()),
+                        needle,
+                    ));
+            if matched {
+                filtered[idx].push(entry.clone());
+            }
+        }
+    }
+
+    state.file_pane_filtered = Some(filtered);
+}
+
+/// Returns true if any file below `dir` fuzzy-matches `needle`.
+/// The walk is capped so a huge tree can't hang the UI.
+fn dir_contains_fuzzy_match(dir: &std::path::Path, needle: &str) -> bool {
+    let scratch = scratch_arena(None);
+    let mut stack = vec![dir.to_path_buf()];
+    let mut visited = 0usize;
+
+    while let Some(dir) = stack.pop() {
+        let Ok(iter) = fs::read_dir(&dir) else { continue };
+
+        for entry in iter.flatten() {
+            visited += 1;
+            if visited > 4096 {
+                return false;
+            }
+
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if fuzzy::score_fuzzy(&scratch, &name, needle, true).0 > 0 {
+                return true;
+            }
+            if !name.starts_with('.') && entry.file_type().is_ok_and(|t| t.is_dir()) {
+                stack.push(entry.path());
+            }
+        }
+    }
+
+    false
 }
 
 fn draw_search(ctx: &mut Context, state: &mut State) {

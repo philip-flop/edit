@@ -579,6 +579,9 @@ impl<'input> Stream<'_, '_, 'input> {
             9 => vk::TAB,
             27 => vk::ESCAPE,
             127 => vk::BACK,
+            // Some terminals report Ctrl+/ (and Ctrl+_) as the transformed
+            // C0 code US (0x1F) even in CSI-u mode. Same as the legacy path.
+            31 => vk::SLASH,
             // a-z: fold to A-Z so it matches the `vk` letter constants.
             0x61..=0x7a => InputKey::new(cp & !0x20),
             // Other printable ASCII passes through as-is.

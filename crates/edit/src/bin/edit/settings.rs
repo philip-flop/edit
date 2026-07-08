@@ -60,7 +60,7 @@ const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
     (
         b"\"fileBrowser.showAtStartup\"",
         concat!(
-            "    // Show the file browser at startup when the editor is wider than 80 columns. Default: false.\n",
+            "    // Show the file browser at startup. Default: false.\n",
             "    // \"fileBrowser.showAtStartup\": false,\n",
         )
         .as_bytes(),
@@ -395,6 +395,8 @@ impl Settings {
                 return Err(apperr::Error::SettingsInvalid("developer.mode"));
             };
             self.developer_mode = b;
+        }
+
         if let Some(value) = root.get("fileBrowser.showAtStartup") {
             let Some(b) = value.as_bool() else {
                 return Err(apperr::Error::SettingsInvalid("fileBrowser.showAtStartup"));

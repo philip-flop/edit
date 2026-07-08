@@ -151,6 +151,8 @@ pub fn draw_project_search(ctx: &mut Context, state: &mut State) {
             Ok(doc) => {
                 let mut tb = doc.buffer.borrow_mut();
                 tb.cursor_move_to_logical(point);
+                // Highlight the matched line so it's easy to spot.
+                tb.select_line();
                 tb.make_cursor_visible();
                 done = true;
             }
