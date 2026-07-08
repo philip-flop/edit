@@ -3292,6 +3292,82 @@ impl<'a> Context<'a, '_> {
         clicked
     }
 
+    /// Appends a submenu to the current menu.
+    ///
+    /// Returns true if the submenu is open. Continue appending items to it in that case,
+    /// then call [`Context::menubar_submenu_end()`].
+    pub fn menubar_submenu_begin(&mut self, text: &str, accelerator: char) -> bool {
+        self.table_next_row();
+        self.attr_focusable();
+
+        // First menu item? Steal focus.
+        if self.tree.current_node.borrow_mut().siblings.prev.is_none() {
+            self.inherit_focus();
+        }
+
+        let focused_or_open = self.contains_focus();
+        if focused_or_open {
+            self.attr_background_rgba(self.indexed(IndexedColor::Green));
+            self.attr_foreground_rgba(self.contrasted(self.indexed(IndexedColor::Green)));
+        }
+
+        let open_from_keyboard = !self.input_consumed
+            && self.is_focused()
+            && matches!(self.input_keyboard, Some(vk::RIGHT | vk::RETURN | vk::SPACE));
+        let open_from_mouse = self.button_activated();
+
+        self.button_label(
+            "menu_submenu",
+            text,
+            ButtonStyle::default().bracketed(false).accelerator(accelerator),
+        );
+        self.label("shortcut", ">");
+        self.attr_padding(Rect { left: 2, top: 0, right: 2, bottom: 0 });
+
+        if open_from_keyboard {
+            self.set_input_consumed();
+        }
+
+        if focused_or_open || open_from_keyboard || open_from_mouse {
+            self.table_begin("flyout");
+            self.attr_float(FloatSpec {
+                anchor: Anchor::Last,
+                gravity_x: 0.0,
+                gravity_y: 0.0,
+                offset_x: 3.0,
+                offset_y: 0.0,
+            });
+            self.attr_border();
+            self.attr_focus_well();
+
+            if open_from_keyboard || open_from_mouse {
+                self.steal_focus();
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Ends the current submenu.
+    pub fn menubar_submenu_end(&mut self) {
+        self.table_end();
+
+        if !self.input_consumed
+            && let Some(key) = self.input_keyboard
+            && matches!(key, vk::ESCAPE | vk::LEFT)
+            && self.contains_focus()
+        {
+            let submenu = self.tree.last_node.borrow();
+            let parent_row = submenu.parent.and_then(|anchor| anchor.borrow().parent);
+            if let Some(parent_row) = parent_row {
+                self.steal_focus_for(parent_row);
+                self.set_input_consumed();
+            }
+        }
+    }
+
     /// Ends the current menu.
     pub fn menubar_menu_end(&mut self) {
         self.table_end();

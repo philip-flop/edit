@@ -189,6 +189,19 @@ fn run() -> apperr::Result<()> {
             }
         }
 
+        if Settings::take_theme_change_request() {
+            apply_theme_colors(&mut tui, &mut state);
+
+            {
+                let mut ctx = tui.create_context(None);
+                draw(&mut ctx, &mut state);
+            }
+            while tui.needs_settling() {
+                let mut ctx = tui.create_context(None);
+                draw(&mut ctx, &mut state);
+            }
+        }
+
         // Render the UI and write it to the terminal.
         {
             let scratch = scratch_arena(None);
