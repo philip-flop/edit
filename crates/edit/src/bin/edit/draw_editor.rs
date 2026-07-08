@@ -96,19 +96,20 @@ fn draw_file_pane(ctx: &mut Context, state: &mut State, content_height: CoordTyp
     {
         let contains_focus = ctx.contains_focus();
 
-        // Header: a right-aligned [X] button to close the pane, then the
-        // current directory.
-        if ctx.button("close", "X", ButtonStyle::default()) {
-            close_pane = true;
-        }
-        ctx.attr_position(Position::Right);
+        // Header: the current directory with the [X] close button inline.
+        ctx.table_begin("header");
+        ctx.table_set_columns(&[COORD_TYPE_SAFE_MAX, 0]);
+        {
+            ctx.table_next_row();
 
-        ctx.label("dir", state.file_pane_dir.as_str());
-        ctx.attr_overflow(Overflow::TruncateMiddle);
+            ctx.label("dir", state.file_pane_dir.as_str());
+            ctx.attr_overflow(Overflow::TruncateMiddle);
 
-        if contains_focus && ctx.consume_shortcut(vk::ESCAPE) {
-            state.wants_editor_focus = true;
+            if ctx.button("close", "X", ButtonStyle::default()) {
+                close_pane = true;
+            }
         }
+        ctx.table_end();
 
         // Fuzzy filter for the entries below. Folders also match if any file
         // inside them (recursively) matches.
@@ -116,16 +117,28 @@ fn draw_file_pane(ctx: &mut Context, state: &mut State, content_height: CoordTyp
             state.file_pane_filtered = None;
             ctx.needs_rerender();
         }
-        if ctx.is_focused() && ctx.consume_shortcut(vk::RETURN) {
-            // Enter moves focus into the filtered list.
-            state.file_pane_focus = true;
+        ctx.attr_border();
+        if ctx.is_focused() {
+            if !state.file_pane_filter.is_empty() && ctx.consume_shortcut(vk::ESCAPE) {
+                state.file_pane_filter.clear();
+                state.file_pane_filtered = None;
+                ctx.needs_rerender();
+            }
+            // Enter or Down moves focus into the filtered list.
+            if ctx.consume_shortcut(vk::RETURN) || ctx.consume_shortcut(vk::DOWN) {
+                state.file_pane_focus = true;
+            }
+        }
+
+        if contains_focus && ctx.consume_shortcut(vk::ESCAPE) {
+            state.wants_editor_focus = true;
         }
 
         if !state.file_pane_filter.is_empty() && state.file_pane_filtered.is_none() {
             refresh_file_pane_filter(state);
         }
 
-        ctx.scrollarea_begin("file-pane-scroll", Size { width: 0, height: content_height - 5 });
+        ctx.scrollarea_begin("file-pane-scroll", Size { width: 0, height: content_height - 6 });
         {
             ctx.next_block_id_mixin(state.file_pane_dir_revision);
             ctx.list_begin("entries");
