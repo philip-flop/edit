@@ -98,7 +98,10 @@ fn draw_file_pane(ctx: &mut Context, state: &mut State, content_height: CoordTyp
 
         // Header: the current directory with the [X] close button inline.
         ctx.table_begin("header");
-        ctx.table_set_columns(&[COORD_TYPE_SAFE_MAX, 0]);
+        // Fixed width for the directory so the [X] button always fits:
+        // pane width minus the border (2), the cell gap (1), and "[X]" (3).
+        ctx.table_set_columns(&[FILE_PANE_WIDTH - 6, 0]);
+        ctx.table_set_cell_gap(Size { width: 1, height: 0 });
         {
             ctx.table_next_row();
 
