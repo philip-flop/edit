@@ -72,9 +72,9 @@ const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
             "    // \"key\" is optional and accepts things like \"F5\" or \"Ctrl+Shift+B\".\n",
             "    // \"$FILE\" in \"command\" is replaced with the current file's path.\n",
             "    // \"commands\": [\n",
-            "    //     { \"name\": \"Build\", \"command\": \"cargo build\", \"key\": \"F5\" },\n",
+            "    //     { \"name\": \"Build\", \"command\": \"cargo build --release\", \"key\": \"F5\" },\n",
             "    //     { \"name\": \"Run gofmt on file\", \"command\": \"gofmt -w $FILE\" }\n",
-            "    // ]\n",
+            "    // ],\n",
         )
         .as_bytes(),
     ),
