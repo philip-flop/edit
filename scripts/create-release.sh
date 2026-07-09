@@ -13,12 +13,11 @@ usage() {
 Usage: scripts/create-release.sh TAG [options]
 
 Creates a GitHub Release for TAG, targeting main by default. The release event
-triggers .github/workflows/release-unix.yml, which uploads macOS and Linux
-archives.
+triggers .github/workflows/release-assets.yml, which uploads release archives.
 
 Options:
   --target REF       Commit, branch, or tag to release from (default: main)
-  --title TITLE     Release title (default: "jedit TAG")
+  --title TITLE     Release title (default: "JEdit TAG")
   --notes NOTES     Release notes text
   --notes-file PATH Read release notes from a file
   --final           Publish as a full release instead of a prerelease
@@ -52,7 +51,7 @@ notes=
 notes_file=
 prerelease=1
 watch=1
-workflow=release-unix.yml
+workflow=release-assets.yml
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -102,8 +101,8 @@ case "$tag" in
         ;;
 esac
 
-[ -z "$title" ] && title="jedit $tag"
-[ -n "$notes" ] || notes="jedit release $tag."
+[ -z "$title" ] && title="JEdit $tag"
+[ -n "$notes" ] || notes="JEdit release $tag."
 
 command -v gh >/dev/null 2>&1 || die "gh is required. Install GitHub CLI and run gh auth login."
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated. Run gh auth login."

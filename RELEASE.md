@@ -86,41 +86,27 @@ a new patch release.
 
 ## Build Release Artifacts
 
-Windows release artifacts are produced by `.pipelines/release.yml`.
+Release artifacts are produced by `.github/workflows/release-assets.yml` when a
+GitHub Release is published. The same workflow can also be run manually for a
+tag.
 
-Run the pipeline for the `vX.Y.Z` tag with:
-
-* `official`: `Official`
-* `createvpack`: `true`
-* `buildPlatforms`: `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`
-
-The expected Windows GitHub Release assets are:
-
-* `jedit-X.Y.Z-x86_64-windows.zip`
-* `jedit-X.Y.Z-aarch64-windows.zip`
-
-Each archive should contain `jedit.exe` and its matching debug symbols. The
-pipeline signs `jedit.exe` before packaging.
-
-macOS and Linux release artifacts are produced by
-`.github/workflows/release-unix.yml` when a GitHub Release is published. The
-same workflow can also be run manually for a tag.
-
-The expected Unix GitHub Release assets are:
+The expected GitHub Release assets are:
 
 * `jedit-X.Y.Z-x86_64-linux.tar.gz`
 * `jedit-X.Y.Z-aarch64-macos.tar.gz`
+* `jedit-X.Y.Z-x86_64-windows.zip`
+* `jedit-X.Y.Z-aarch64-windows.zip`
 
 Each archive contains the `jedit` binary, `LICENSE`, `README.md`, and the
-`jedit.1` manpage. The source-build installer remains available as a fallback
-and builds from the tag published on GitHub.
+`jedit.1` manpage. Windows archives contain `jedit.exe`. The source-build
+installer remains available as a fallback and builds from the tag published on
+GitHub.
 
 ## Publish the GitHub Release
 
 Create a GitHub Release from the pushed tag.
 
-The helper script can create the release and wait for the macOS/Linux asset
-workflow:
+The helper script can create the release and wait for the asset workflow:
 
 ```sh
 scripts/create-release.sh vX.Y.Z-rc.1
@@ -128,13 +114,12 @@ scripts/create-release.sh vX.Y.Z --final --notes-file RELEASE_NOTES.md
 ```
 
 1. Use the tag name as the release title, for example `vX.Y.Z`.
-2. Attach the Windows release archives.
-3. Include a short changelog with user-visible changes and fixes.
-4. Mention that this fork is installed directly from GitHub Releases or the
+2. Include a short changelog with user-visible changes and fixes.
+3. Mention that this fork is installed directly from GitHub Releases or the
    source-build installer.
-5. Mark the release as a pre-release only for preview builds.
-6. Publish the release.
-7. Confirm the macOS and Linux release workflow uploads its archives.
+4. Mark the release as a pre-release only for preview builds.
+5. Publish the release.
+6. Confirm the release workflow uploads its archives.
 
 ## Install Channels
 
@@ -149,7 +134,7 @@ jedit.exe
 
 Release owner responsibility:
 
-* Publish the GitHub Release with both Windows zip assets attached.
+* Confirm the GitHub Release has both Windows zip assets attached.
 * Do not submit the fork to WinGet.
 
 ### macOS
