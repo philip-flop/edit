@@ -18,7 +18,7 @@ archives.
 
 Options:
   --target REF       Commit, branch, or tag to release from (default: main)
-  --title TITLE     Release title (default: "JEdit TAG")
+  --title TITLE     Release title (default: "jedit TAG")
   --notes NOTES     Release notes text
   --notes-file PATH Read release notes from a file
   --final           Publish as a full release instead of a prerelease
@@ -102,8 +102,8 @@ case "$tag" in
         ;;
 esac
 
-[ -z "$title" ] && title="JEdit $tag"
-[ -n "$notes" ] || notes="JEdit release $tag."
+[ -z "$title" ] && title="jedit $tag"
+[ -n "$notes" ] || notes="jedit release $tag."
 
 command -v gh >/dev/null 2>&1 || die "gh is required. Install GitHub CLI and run gh auth login."
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated. Run gh auth login."
