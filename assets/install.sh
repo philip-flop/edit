@@ -9,8 +9,9 @@ die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
-Usage: install.sh [--dev] [--system]
+Usage: install.sh [--dev|--rc] [--system]
   --dev     Build from the main branch instead of the latest release
+  --rc      Build from the latest release candidate / prerelease
   --system  Install to /usr/local/bin (requires sudo)
 
 Without --system, installs jedit to ~/.local/bin.
@@ -21,15 +22,19 @@ EOF
 #### Parse arguments
 
 dev=0
+rc=0
 system=0
 for arg in "$@"; do
     case "$arg" in
         --dev) dev=1 ;;
+        --rc) rc=1 ;;
         --system) system=1 ;;
         -h|--help) usage ;;
         *) usage ;;
     esac
 done
+
+[ "$dev" = 0 ] || [ "$rc" = 0 ] || die "--dev and --rc cannot be used together."
 
 if [ "$system" = 1 ]; then
     command -v sudo >/dev/null 2>&1 || die "sudo is required for --system installs."
@@ -128,6 +133,23 @@ esac
 if [ "$dev" = 1 ]; then
     log "Downloading main branch"
     download "$tmpdir/edit.tar.gz" 'https://github.com/philip-flop/edit/archive/refs/heads/main.tar.gz'
+elif [ "$rc" = 1 ]; then
+    log "Fetching latest release candidate tag"
+    download "$tmpdir/releases.json" 'https://api.github.com/repos/philip-flop/edit/releases?per_page=20'
+    tag=$(awk '
+        /"tag_name":/ {
+            tag = $0
+            sub(/^.*"tag_name": *"/, "", tag)
+            sub(/".*$/, "", tag)
+        }
+        /"prerelease": *true/ && tag != "" {
+            print tag
+            exit
+        }
+    ' "$tmpdir/releases.json")
+    [ -n "$tag" ] || die "Could not determine latest release candidate tag."
+    log "Latest release candidate: $tag"
+    download "$tmpdir/edit.tar.gz" "https://github.com/philip-flop/edit/archive/refs/tags/$tag.tar.gz"
 else
     log "Fetching latest release tag"
     download "$tmpdir/latest.json" 'https://api.github.com/repos/philip-flop/edit/releases/latest'

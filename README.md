@@ -46,7 +46,12 @@ The following command installs `jedit` into `~/.local/bin`:
 curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/philip-flop/edit/main/assets/install.sh | sh
 ```
 
-Additional flags are `--dev`, to build directly from the main branch, and `--system` to install into `/usr/local/bin`. For instance:
+Additional flags are `--rc`, to build the latest release candidate, `--dev`, to build directly from the main branch, and `--system` to install into `/usr/local/bin`. For instance:
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/philip-flop/edit/main/assets/install.sh | sh -s -- --rc
+```
+
+Or, to install a main-branch build system-wide:
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/philip-flop/edit/main/assets/install.sh | sh -s -- --dev --system
 ```
