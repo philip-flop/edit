@@ -2265,7 +2265,7 @@ impl TextBuffer {
                             right: destination.right,
                             bottom: cursor.y + 1,
                         },
-                        StraightRgba::from_le(0x7f7f7f7f),
+                        StraightRgba::from_le(0x3f3f3f3f),
                     );
                 }
             }
