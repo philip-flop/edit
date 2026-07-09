@@ -109,7 +109,6 @@ same workflow can also be run manually for a tag.
 The expected Unix GitHub Release assets are:
 
 * `jedit-X.Y.Z-x86_64-linux.tar.gz`
-* `jedit-X.Y.Z-x86_64-macos.tar.gz`
 * `jedit-X.Y.Z-aarch64-macos.tar.gz`
 
 Each archive contains the `jedit` binary, `LICENSE`, `README.md`, and the
@@ -150,14 +149,13 @@ Release owner responsibility:
 Primary user install path:
 
 ```sh
-# Download and extract jedit-X.Y.Z-aarch64-macos.tar.gz or
-# jedit-X.Y.Z-x86_64-macos.tar.gz, then run:
+# Download and extract jedit-X.Y.Z-aarch64-macos.tar.gz, then run:
 ./jedit --version
 ```
 
 Release owner responsibility:
 
-* Confirm the GitHub Release has both macOS archives attached.
+* Confirm the GitHub Release has the macOS archive attached.
 * Keep the source-build installer working as a fallback.
 * Do not submit the fork to Homebrew.
 

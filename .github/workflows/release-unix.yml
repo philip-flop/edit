@@ -28,10 +28,6 @@ jobs:
             asset_suffix: x86_64-linux
             install_packages: sudo apt-get update && sudo apt-get install -y libicu-dev
           - os: macos-latest
-            target: x86_64-apple-darwin
-            asset_suffix: x86_64-macos
-            install_packages: "true"
-          - os: macos-latest
             target: aarch64-apple-darwin
             asset_suffix: aarch64-macos
             install_packages: "true"
