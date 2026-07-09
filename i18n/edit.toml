@@ -992,7 +992,7 @@ zh-hans = "转到文件…"
 zh-hant = "跳至檔案…"
 
 [ViewSetTheme]
-en = "Set Theme"
+en = "  Set Theme"
 
 [ViewThemeSystem]
 en = "Theme: System"
