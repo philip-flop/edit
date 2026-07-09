@@ -119,6 +119,14 @@ and builds from the tag published on GitHub.
 
 Create a GitHub Release from the pushed tag.
 
+The helper script can create the release and wait for the macOS/Linux asset
+workflow:
+
+```sh
+scripts/create-release.sh vX.Y.Z-rc.1
+scripts/create-release.sh vX.Y.Z --final --notes-file RELEASE_NOTES.md
+```
+
 1. Use the tag name as the release title, for example `vX.Y.Z`.
 2. Attach the Windows release archives.
 3. Include a short changelog with user-visible changes and fixes.
