@@ -1267,13 +1267,14 @@ impl TextBuffer {
         }
 
         // If the user moved the cursor since the last search, but the needle remained the same,
-        // we still need to move the start of the search to the new cursor position.
+        // we still need to move the start of the search to the new cursor position. A user
+        // selection is the current match, so start just after it to find the next occurrence.
         let next_search_offset = if self.selection_generation == search.selection_generation {
             search.next_search_offset
         } else {
             match self.selection {
                 Some(TextBufferSelection { beg, end }) => {
-                    self.cursor_move_to_logical_internal(self.cursor, beg.min(end)).offset
+                    self.cursor_move_to_logical_internal(self.cursor, beg.max(end)).offset
                 }
                 _ => self.cursor.offset,
             }
@@ -2265,7 +2266,7 @@ impl TextBuffer {
                             right: destination.right,
                             bottom: cursor.y + 1,
                         },
-                        StraightRgba::from_le(0x7f7f7f7f),
+                        StraightRgba::from_le(0x3f3f3f3f),
                     );
                 }
             }
@@ -3703,6 +3704,24 @@ mod tests {
         // The match cap is honored.
         let capped = buf.find_all("foo", SearchOptions::default(), 1).unwrap();
         assert_eq!(capped.len(), 1);
+    }
+
+    #[test]
+    fn find_selects_next_match_after_user_selection() {
+        let mut buf = new_buffer(b"the and the plus the\n");
+        buf.selection_update_logical(Point { x: 3, y: 0 });
+
+        buf.find_and_select("the", SearchOptions::default()).unwrap();
+
+        let (beg, end) = buf.selection_range().unwrap();
+        assert_eq!(beg.logical_pos, Point { x: 8, y: 0 });
+        assert_eq!(end.logical_pos, Point { x: 11, y: 0 });
+
+        buf.find_and_select("the", SearchOptions::default()).unwrap();
+
+        let (beg, end) = buf.selection_range().unwrap();
+        assert_eq!(beg.logical_pos, Point { x: 17, y: 0 });
+        assert_eq!(end.logical_pos, Point { x: 20, y: 0 });
     }
 
     #[test]

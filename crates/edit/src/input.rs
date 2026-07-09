@@ -226,6 +226,8 @@ pub mod kbmod {
     pub const CTRL_ALT_SHIFT: InputKeyMod = InputKeyMod::new(0x07000000);
     /// Super (Windows/Command) + Shift, e.g. macOS Cmd+Shift+F.
     pub const SUPER_SHIFT: InputKeyMod = InputKeyMod::new(0x0C000000);
+    /// Super (Windows/Command) + Alt, used for word navigation on macOS.
+    pub const ALT_SUPER: InputKeyMod = InputKeyMod::new(0x0A000000);
 }
 
 /// Mouse input state. Up/Down, Left/Right, etc.
@@ -579,6 +581,10 @@ impl<'input> Stream<'_, '_, 'input> {
             9 => vk::TAB,
             27 => vk::ESCAPE,
             127 => vk::BACK,
+            // Some Kitty-compatible terminals encode modified arrow keys as
+            // private-use functional key codes instead of legacy CSI `1;...D/C`.
+            57350 => vk::LEFT,
+            57351 => vk::RIGHT,
             // Some terminals report Ctrl+/ (and Ctrl+_) as the transformed
             // C0 code US (0x1F) even in CSI-u mode. Same as the legacy path.
             31 => vk::SLASH,
@@ -703,5 +709,16 @@ mod tests {
         assert_eq!(decode_key("\x1b[9u"), vk::TAB);
         assert_eq!(decode_key("\x1b[27u"), vk::ESCAPE);
         assert_eq!(decode_key("\x1b[127u"), vk::BACK);
+    }
+
+    #[test]
+    fn super_arrow_keys() {
+        // Legacy Kitty encoding for modified arrows.
+        assert_eq!(decode_key("\x1b[1;9D"), kbmod::SUPER | vk::LEFT);
+        assert_eq!(decode_key("\x1b[1;9C"), kbmod::SUPER | vk::RIGHT);
+
+        // Kitty-compatible terminals may instead use private-use key codes.
+        assert_eq!(decode_key("\x1b[57350;9u"), kbmod::SUPER | vk::LEFT);
+        assert_eq!(decode_key("\x1b[57351;9u"), kbmod::SUPER | vk::RIGHT);
     }
 }

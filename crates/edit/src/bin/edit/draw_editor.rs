@@ -327,6 +327,7 @@ fn draw_search(ctx: &mut Context, state: &mut State) {
         if let Some(selection) = state.active_user_selection_text() {
             state.search_needle = selection;
             focus = state.wants_search.kind;
+            action = Some(SearchAction::Search);
         } else {
             state.search_needle.clear();
         }
