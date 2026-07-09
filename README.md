@@ -1,47 +1,52 @@
-# ![Application Icon for Edit](./assets/edit.svg) Edit
+# ![Application Icon for Edit](./assets/edit.svg) JEdit
 
 A simple editor for simple needs.
 
-This editor pays homage to the classic [MS-DOS Editor](https://en.wikipedia.org/wiki/MS-DOS_Editor), but with a modern interface and input controls similar to VS Code. The goal is to provide an accessible editor that even users largely unfamiliar with terminals can easily use.
+JEdit is a fork of Edit that pays homage to the classic [MS-DOS Editor](https://en.wikipedia.org/wiki/MS-DOS_Editor), but with a modern interface and input controls similar to VS Code. The goal is to provide an accessible editor that even users largely unfamiliar with terminals can easily use.
 
 ![Screenshot of Edit with the About dialog in the foreground](./assets/edit_hero_image.png)
 
 ## Installation
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/microsoft-edit.svg?exclude_unsupported=1)](https://repology.org/project/microsoft-edit/versions)
-
-You can also download binaries from [our Releases page](https://github.com/microsoft/edit/releases/latest).
+Download binaries from [the Releases page](https://github.com/philip-flop/edit/releases/latest), or build from source with the installer below.
 
 ### Windows
 
-You can install the latest version with WinGet:
+Download the latest Windows zip from [the Releases page](https://github.com/philip-flop/edit/releases/latest), extract it, and run:
 ```powershell
-winget install Microsoft.Edit
+jedit.exe
 ```
 
-### Linux (build from source)
+### macOS
 
-If your distribution does not provide binaries, or if you'd like to build your own, you can use our install script, provided you have installed:
+Download the latest macOS archive from [the Releases page](https://github.com/philip-flop/edit/releases/latest), extract it, and run:
+```sh
+./jedit
+```
+
+### Linux
+
+Download the latest Linux archive from [the Releases page](https://github.com/philip-flop/edit/releases/latest), extract it, and run:
+```sh
+./jedit
+```
+
+### macOS and Linux from source
+
+You can use the install script, provided you have installed:
 * Rust (via `rustup` or similar)
 * A C compiler (e.g. `gcc`)
 * ICU (e.g. libicu78, libicu, icu)
 * curl/wget and tar
 
-The following command will then install `msedit` into `~/.local/bin`:
+The following command installs `jedit` into `~/.local/bin`:
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/microsoft/edit/main/assets/install.sh | sh
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/philip-flop/edit/main/assets/install.sh | sh
 ```
 
 Additional flags are `--dev`, to build directly from the main branch, and `--system` to install into `/usr/local/bin`. For instance:
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/microsoft/edit/main/assets/install.sh | sh -s -- --dev --system
-```
-
-### macOS
-
-You can install the latest version with Homebrew:
-```sh
-brew install msedit
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/philip-flop/edit/main/assets/install.sh | sh -s -- --dev --system
 ```
 
 ## Build Instructions
@@ -73,10 +78,8 @@ Environment variable | Description
 
 ### Package Naming
 
-The canonical executable name is "edit" and the alternative name is "msedit".
-We're aware of the potential conflict of "edit" with existing commands and recommend alternatively naming packages and executables "msedit".
-Names such as "ms-edit" should be avoided.
-Assigning an "edit" alias is recommended, if possible.
+The canonical executable name for this fork is `jedit`. The crate package remains
+named `edit` internally to keep upstream library paths stable.
 
 ### ICU library name (SONAME)
 

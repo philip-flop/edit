@@ -320,7 +320,7 @@ fn handle_stdin(state: &mut State) -> apperr::Result<()> {
 
 fn print_help() {
     sys::write_stdout(concat!(
-        "Usage: edit [OPTIONS] [FILE[:LINE[:COLUMN]]]\n",
+        "Usage: jedit [OPTIONS] [FILE[:LINE[:COLUMN]]]\n",
         "Options:\n",
         "    -h, --help       Print this help message\n",
         "    -v, --version    Print the version number\n",
@@ -331,7 +331,7 @@ fn print_help() {
 }
 
 fn print_version() {
-    sys::write_stdout(concat!("edit version ", env!("CARGO_PKG_VERSION"), "\n"));
+    sys::write_stdout(concat!("jedit version ", env!("CARGO_PKG_VERSION"), "\n"));
 }
 
 fn draw(ctx: &mut Context, state: &mut State) {
@@ -468,7 +468,7 @@ fn write_terminal_title<'a>(arena: &'a Arena, output: &mut BString<'a>, state: &
         output.push_str(arena, &sanitize_control_chars(filename));
         output.push_str(arena, " - ");
     }
-    output.push_str(arena, "edit\x1b\\");
+    output.push_str(arena, "jedit\x1b\\");
 
     state.osc_title_file_status.filename = filename.to_string();
     state.osc_title_file_status.dirty = dirty;

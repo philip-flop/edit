@@ -234,7 +234,7 @@ pub fn draw_dialog_about(ctx: &mut Context, state: &mut State) {
         ctx.inherit_focus();
         ctx.attr_padding(Rect::three(1, 2, 1));
         {
-            ctx.label("description", "Microsoft Edit");
+            ctx.label("description", "JEdit");
             ctx.attr_overflow(Overflow::TruncateTail);
             ctx.attr_position(Position::Center);
 

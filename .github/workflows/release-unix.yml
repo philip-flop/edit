@@ -1,0 +1,80 @@
+name: Build macOS and Linux release assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to upload assets to, for example v20.0.0
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset_suffix }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_suffix: x86_64-linux
+            install_packages: sudo apt-get update && sudo apt-get install -y libicu-dev
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            asset_suffix: x86_64-macos
+            install_packages: "true"
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset_suffix: aarch64-macos
+            install_packages: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Install system dependencies
+        run: ${{ matrix.install_packages }}
+
+      - name: Install Rust
+        run: rustup toolchain install nightly --no-self-update --profile minimal --component rust-src
+
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }} --toolchain nightly
+
+      - name: Build release binary
+        run: cargo +nightly build -p edit --release --target ${{ matrix.target }} --config .cargo/release.toml
+        env:
+          RUSTC_BOOTSTRAP: 1
+
+      - name: Package release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}"
+          version="${tag#v}"
+          archive_name="jedit-${version}-${{ matrix.asset_suffix }}"
+          mkdir -p "dist/${archive_name}"
+          cp "target/${{ matrix.target }}/release/jedit" "dist/${archive_name}/jedit"
+          cp LICENSE README.md "dist/${archive_name}/"
+          cp assets/manpage/jedit.1 "dist/${archive_name}/"
+          tar -czf "dist/${archive_name}.tar.gz" -C dist "${archive_name}"
+
+      - name: Upload release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}"
+          version="${tag#v}"
+          gh release upload "$tag" "dist/jedit-${version}-${{ matrix.asset_suffix }}.tar.gz" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

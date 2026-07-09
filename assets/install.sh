@@ -13,7 +13,7 @@ Usage: install.sh [--dev] [--system]
   --dev     Build from the main branch instead of the latest release
   --system  Install to /usr/local/bin (requires sudo)
 
-Without --system, installs to ~/.local/bin.
+Without --system, installs jedit to ~/.local/bin.
 EOF
     exit 1
 }
@@ -127,14 +127,14 @@ esac
 
 if [ "$dev" = 1 ]; then
     log "Downloading main branch"
-    download "$tmpdir/edit.tar.gz" 'https://github.com/microsoft/edit/archive/refs/heads/main.tar.gz'
+    download "$tmpdir/edit.tar.gz" 'https://github.com/philip-flop/edit/archive/refs/heads/main.tar.gz'
 else
     log "Fetching latest release tag"
-    download "$tmpdir/latest.json" 'https://api.github.com/repos/microsoft/edit/releases/latest'
+    download "$tmpdir/latest.json" 'https://api.github.com/repos/philip-flop/edit/releases/latest'
     tag=$(grep -oE '"tag_name": *"[^"]+"' "$tmpdir/latest.json" | grep -oE 'v[^"]+')
     [ -n "$tag" ] || die "Could not determine latest release tag."
     log "Latest release: $tag"
-    download "$tmpdir/edit.tar.gz" "https://github.com/microsoft/edit/archive/refs/tags/$tag.tar.gz"
+    download "$tmpdir/edit.tar.gz" "https://github.com/philip-flop/edit/archive/refs/tags/$tag.tar.gz"
 fi
 
 srcdir="$tmpdir/edit-src"
@@ -157,7 +157,7 @@ else
     (cd "$srcdir" && cargo build -p edit --release)
 fi
 
-bin="$srcdir/target/release/edit"
+bin="$srcdir/target/release/jedit"
 [ -x "$bin" ] || die "Build failed: binary not found."
 
 #### Install
@@ -172,31 +172,17 @@ fi
 
 log "Installing to $dest"
 $run mkdir -p "$dest"
-$run cp "$bin" "$dest/msedit"
-$run chmod 755 "$dest/msedit"
-if [ ! -e "$dest/edit" ] || [ "$(readlink "$dest/edit" 2>/dev/null)" = "msedit" ]; then
-    $run ln -sf msedit "$dest/edit"
-    edit_linked=1
-else
-    edit_linked=0
-fi
+$run cp "$bin" "$dest/jedit"
+$run chmod 755 "$dest/jedit"
 
 #### Summary
 
 case ":$PATH:" in
     *":$dest:"*)
-        if [ "$edit_linked" = 1 ]; then
-            echo "✅ Done. Run 'edit' or 'msedit' to start."
-        else
-            echo "✅ Done. Run 'msedit' to start."
-        fi
+        echo "✅ Done. Run 'jedit' to start."
         ;;
     *)
         echo "⚠️ Done. $dest is not in PATH; you may need to add it."
-        if [ "$edit_linked" = 1 ]; then
-            echo "Run '$dest/edit' or '$dest/msedit' to start."
-        else
-            echo "Run '$dest/msedit' to start."
-        fi
+        echo "Run '$dest/jedit' to start."
         ;;
 esac
