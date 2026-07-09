@@ -1,6 +1,6 @@
 # Release Process
 
-This document describes how to release JEdit and how users install it on
+This document describes how to release jedit and how users install it on
 Windows, macOS, and Linux.
 
 ## Goals
@@ -14,9 +14,9 @@ Windows, macOS, and Linux.
 
 ## Versioning
 
-JEdit uses SemVer-style versions and `vX.Y.Z` Git tags. This fork tracks the
+jedit uses SemVer-style versions and `vX.Y.Z` Git tags. This fork tracks the
 upstream minor and patch version under major version 20: upstream `v2.0.0`
-corresponds to JEdit `v20.0.0`, upstream `v2.1.3` corresponds to JEdit
+corresponds to jedit `v20.0.0`, upstream `v2.1.3` corresponds to jedit
 `v20.1.3`, and so on.
 
 Update these files together for every release:
@@ -77,7 +77,7 @@ After the release commit is on `main`, create and push an annotated tag:
 ```sh
 git switch main
 git pull --ff-only
-git tag -a vX.Y.Z -m "JEdit vX.Y.Z"
+git tag -a vX.Y.Z -m "jedit vX.Y.Z"
 git push origin vX.Y.Z
 ```
 

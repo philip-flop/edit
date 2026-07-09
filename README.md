@@ -1,10 +1,10 @@
-# ![Application Icon for Edit](./assets/edit.svg) JEdit
+# ![Application Icon for Edit](./assets/edit.svg) jedit
 
 jedit is a fork of edit by Mircosoft
 
 A simple editor for simple needs.
 
-JEdit is a fork of Edit that pays homage to the classic [MS-DOS Editor](https://en.wikipedia.org/wiki/MS-DOS_Editor), but with a modern interface and input controls similar to VS Code. The goal is to provide an accessible editor that even users largely unfamiliar with terminals can easily use.
+jedit is a fork of Edit that pays homage to the classic [MS-DOS Editor](https://en.wikipedia.org/wiki/MS-DOS_Editor), but with a modern interface and input controls similar to VS Code. The goal is to provide an accessible editor that even users largely unfamiliar with terminals can easily use.
 
 ![Screenshot of Edit with the About dialog in the foreground](./assets/edit_hero_image.png)
 

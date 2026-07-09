@@ -1,9 +1,9 @@
 name: jedit
 base: core24
 version: "20.0.0"
-summary: JEdit is an MS-DOS inspired text editor
+summary: jedit is an MS-DOS inspired text editor
 description: |
-  JEdit is a fork of Edit. It pays homage to the classic MS-DOS Editor, but with a modern interface and input controls similar to VS Code. Learn more at https://github.com/philip-flop/edit
+  jedit is a fork of Edit. It pays homage to the classic MS-DOS Editor, but with a modern interface and input controls similar to VS Code. Learn more at https://github.com/philip-flop/edit
 
 grade: stable
 confinement: strict
