@@ -991,6 +991,24 @@ vi = "Đi tới tệp…"
 zh-hans = "转到文件…"
 zh-hant = "跳至檔案…"
 
+[ViewSetTheme]
+en = "Set Theme"
+
+[ViewThemeSystem]
+en = "Theme: System"
+
+[ViewThemeCatppuccinLatte]
+en = "Theme: Catppuccin Latte"
+
+[ViewThemeCatppuccinFrappe]
+en = "Theme: Catppuccin Frappe"
+
+[ViewThemeCatppuccinMacchiato]
+en = "Theme: Catppuccin Macchiato"
+
+[ViewThemeCatppuccinMocha]
+en = "Theme: Catppuccin Mocha"
+
 # A menu bar item
 [Command]
 en = "Command"

@@ -9,7 +9,7 @@ use edit::tui::*;
 use stdext::arena_format;
 
 use crate::localization::*;
-use crate::settings::{CommandSpec, Settings};
+use crate::settings::{CommandSpec, Settings, Theme};
 use crate::state::*;
 
 pub fn draw_menubar(ctx: &mut Context, state: &mut State) {
@@ -178,7 +178,29 @@ fn draw_menu_view(ctx: &mut Context, state: &mut State) {
         ctx.needs_rerender();
     }
 
+    if ctx.menubar_submenu_begin(loc(LocId::ViewSetTheme), 'T') {
+        draw_menu_theme_choices(ctx);
+        ctx.menubar_submenu_end();
+    }
+
     ctx.menubar_menu_end();
+}
+
+fn draw_menu_theme_choices(ctx: &mut Context) {
+    let current_theme = Settings::borrow().theme;
+    for theme in Theme::ALL {
+        let label = match theme {
+            Theme::System => loc(LocId::ViewThemeSystem),
+            Theme::CatppuccinLatte => loc(LocId::ViewThemeCatppuccinLatte),
+            Theme::CatppuccinFrappe => loc(LocId::ViewThemeCatppuccinFrappe),
+            Theme::CatppuccinMacchiato => loc(LocId::ViewThemeCatppuccinMacchiato),
+            Theme::CatppuccinMocha => loc(LocId::ViewThemeCatppuccinMocha),
+        };
+        if ctx.menubar_menu_checkbox(label, '\0', vk::NULL, current_theme == theme) {
+            Settings::set_theme(theme);
+            ctx.needs_rerender();
+        }
+    }
 }
 
 fn draw_menu_command(ctx: &mut Context, state: &mut State) {

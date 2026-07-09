@@ -1,5 +1,7 @@
 # ![Application Icon for Edit](./assets/edit.svg) JEdit
 
+jedit is a fork of edit by Mircosoft
+
 A simple editor for simple needs.
 
 JEdit is a fork of Edit that pays homage to the classic [MS-DOS Editor](https://en.wikipedia.org/wiki/MS-DOS_Editor), but with a modern interface and input controls similar to VS Code. The goal is to provide an accessible editor that even users largely unfamiliar with terminals can easily use.
