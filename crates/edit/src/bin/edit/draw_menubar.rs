@@ -136,11 +136,11 @@ fn draw_menu_edit(ctx: &mut Context, state: &mut State) {
         tb.delete_lines();
         ctx.needs_rerender();
     }
-    if let Some(token) = tb.language().and_then(edit::lsh::line_comment_token) {
-        if ctx.menubar_menu_button(loc(LocId::EditToggleComment), 'G', kbmod::CTRL | vk::SLASH) {
-            tb.toggle_line_comment(token);
-            ctx.needs_rerender();
-        }
+    if let Some(token) = tb.language().and_then(edit::lsh::line_comment_token)
+        && ctx.menubar_menu_button(loc(LocId::EditToggleComment), 'G', kbmod::CTRL | vk::SLASH)
+    {
+        tb.toggle_line_comment(token);
+        ctx.needs_rerender();
     }
     ctx.menubar_menu_end();
 }
@@ -301,20 +301,20 @@ pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
                 ctx.table_next_row();
                 ctx.label("corner", "fg/bg");
                 ctx.attr_overflow(Overflow::TruncateTail);
-                for bg in 0..THEME_COLOR_COUNT {
+                for (bg, name) in THEME_COLOR_NAMES.iter().enumerate() {
                     ctx.next_block_id_mixin(bg as u64);
                     let bg_color = indexed_color(bg);
-                    ctx.label("bg", THEME_COLOR_NAMES[bg]);
+                    ctx.label("bg", name);
                     ctx.attr_background_rgba(ctx.indexed(bg_color));
                     ctx.attr_foreground_rgba(ctx.contrasted(ctx.indexed(bg_color)));
                     ctx.attr_overflow(Overflow::TruncateTail);
                 }
 
-                for fg in 0..THEME_COLOR_COUNT {
+                for (fg, name) in THEME_COLOR_NAMES.iter().enumerate() {
                     ctx.next_block_id_mixin(fg as u64);
                     ctx.table_next_row();
                     let fg_color = indexed_color(fg);
-                    ctx.label("fg", THEME_COLOR_NAMES[fg]);
+                    ctx.label("fg", name);
                     ctx.attr_foreground_rgba(ctx.indexed(fg_color));
                     ctx.attr_overflow(Overflow::TruncateTail);
 
