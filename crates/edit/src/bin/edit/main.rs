@@ -105,8 +105,8 @@ fn run() -> apperr::Result<()> {
     apply_theme_colors(&mut tui, &mut state);
 
     state.file_pane_visible = Settings::borrow().file_browser_show_at_startup;
-    if tui.size().width > 40{
-        state.file_pane_visible =  false;
+    if tui.size().width > 40 {
+        state.file_pane_visible = false;
     }
 
     sys::inject_window_size_into_stdin();
