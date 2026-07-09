@@ -235,7 +235,7 @@ impl TryFrom<u32> for HighlightKind {{
 
         _ = writeln!(
             output,
-            "\n#[rustfmt::skip] pub const ASSEMBLY: [u8; {len}] = [",
+            "\n#[rustfmt::skip] pub static ASSEMBLY: [u8; {len}] = [",
             len = assembly.instructions.len() + Instruction::MAX_ENCODED_SIZE,
         );
         let line_num_width = assembly.instructions.len().checked_ilog10().unwrap_or(0) as usize + 1;

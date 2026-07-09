@@ -2730,7 +2730,8 @@ impl<'a> Context<'a, '_> {
                 },
                 vk::SLASH => match modifiers {
                     kbmod::CTRL if !single_line => {
-                        if let Some(token) = tb.language().and_then(crate::lsh::line_comment_token) {
+                        if let Some(token) = tb.language().and_then(crate::lsh::line_comment_token)
+                        {
                             tb.toggle_line_comment(token);
                         }
                     }

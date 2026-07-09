@@ -1310,9 +1310,8 @@ impl TextBuffer {
 
             let mut bytes = Vec::new();
             self.buffer.extract_raw(line_start.offset..line_end.offset, &mut bytes, 0);
-            let line_text = String::from_utf8_lossy(&bytes)
-                .trim_end_matches(['\r', '\n'])
-                .to_string();
+            let line_text =
+                String::from_utf8_lossy(&bytes).trim_end_matches(['\r', '\n']).to_string();
 
             out.push(SearchMatch {
                 line: pos.y + 1,
@@ -2955,8 +2954,11 @@ impl TextBuffer {
         let del_beg_off = if has_newline || beg <= 0 {
             start
         } else {
-            self.cursor_move_to_logical_internal(self.cursor, Point { x: CoordType::MAX, y: beg - 1 })
-                .offset
+            self.cursor_move_to_logical_internal(
+                self.cursor,
+                Point { x: CoordType::MAX, y: beg - 1 },
+            )
+            .offset
         };
 
         if stop <= del_beg_off {
