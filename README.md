@@ -14,7 +14,17 @@ Download binaries from [the Releases page](https://github.com/philip-flop/edit/r
 
 ### Windows
 
-Download the latest Windows zip from [the Releases page](https://github.com/philip-flop/edit/releases/latest), extract it, and run:
+Install the latest Windows release with PowerShell:
+```powershell
+irm https://raw.githubusercontent.com/philip-flop/edit/main/assets/install.ps1 | iex
+```
+
+To install the latest release candidate:
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/philip-flop/edit/main/assets/install.ps1))) -Rc
+```
+
+You can also download the latest Windows zip from [the Releases page](https://github.com/philip-flop/edit/releases/latest), extract it, and run:
 ```powershell
 jedit.exe
 ```

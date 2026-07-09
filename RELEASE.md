@@ -128,13 +128,13 @@ scripts/create-release.sh vX.Y.Z --final --notes-file RELEASE_NOTES.md
 Primary user install path:
 
 ```powershell
-# Download and extract jedit-X.Y.Z-x86_64-windows.zip, then run:
-jedit.exe
+irm https://raw.githubusercontent.com/philip-flop/edit/main/assets/install.ps1 | iex
 ```
 
 Release owner responsibility:
 
 * Confirm the GitHub Release has both Windows zip assets attached.
+* Confirm `assets/install.ps1` installs the latest release.
 * Do not submit the fork to WinGet.
 
 ### macOS
