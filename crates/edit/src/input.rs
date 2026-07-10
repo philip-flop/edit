@@ -716,6 +716,9 @@ mod tests {
         // Legacy Kitty encoding for modified arrows.
         assert_eq!(decode_key("\x1b[1;9D"), kbmod::SUPER | vk::LEFT);
         assert_eq!(decode_key("\x1b[1;9C"), kbmod::SUPER | vk::RIGHT);
+        // Ghostty includes the Kitty key-event type as a subparameter.
+        assert_eq!(decode_key("\x1b[1;9:1D"), kbmod::SUPER | vk::LEFT);
+        assert_eq!(decode_key("\x1b[1;9:1C"), kbmod::SUPER | vk::RIGHT);
 
         // Kitty-compatible terminals may instead use private-use key codes.
         assert_eq!(decode_key("\x1b[57350;9u"), kbmod::SUPER | vk::LEFT);
