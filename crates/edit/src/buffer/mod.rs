@@ -3722,6 +3722,12 @@ mod tests {
         let (beg, end) = buf.selection_range().unwrap();
         assert_eq!(beg.logical_pos, Point { x: 17, y: 0 });
         assert_eq!(end.logical_pos, Point { x: 20, y: 0 });
+
+        buf.find_and_select("the", SearchOptions::default()).unwrap();
+
+        let (beg, end) = buf.selection_range().unwrap();
+        assert_eq!(beg.logical_pos, Point { x: 0, y: 0 });
+        assert_eq!(end.logical_pos, Point { x: 3, y: 0 });
     }
 
     #[test]

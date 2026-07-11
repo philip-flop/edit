@@ -295,10 +295,22 @@ pub fn draw_dialog_about(ctx: &mut Context, state: &mut State) {
     }
 }
 
-const THEME_COLOR_COUNT: usize = 18;
-const THEME_COLOR_NAMES: [&str; THEME_COLOR_COUNT] = [
-    "blk", "red", "grn", "ylw", "blu", "mag", "cyn", "wht", "bBlk", "bRed", "bGrn", "bYlw", "bBlu",
-    "bMag", "bCyn", "bWht", "bg", "fg",
+/// Explicit indexed foreground/background pairs used by editor text and UI.
+/// Colors derived through alpha blending or `contrasted()` are intentionally
+/// omitted because they are not fixed palette pairs.
+const THEME_COLOR_PAIRS: &[(IndexedColor, IndexedColor)] = &[
+    (IndexedColor::Foreground, IndexedColor::Background),
+    (IndexedColor::Green, IndexedColor::Background),
+    (IndexedColor::BrightYellow, IndexedColor::Background),
+    (IndexedColor::BrightRed, IndexedColor::Background),
+    (IndexedColor::BrightCyan, IndexedColor::Background),
+    (IndexedColor::BrightBlue, IndexedColor::Background),
+    (IndexedColor::BrightGreen, IndexedColor::Background),
+    (IndexedColor::BrightMagenta, IndexedColor::Background),
+    (IndexedColor::Black, IndexedColor::White),
+    (IndexedColor::BrightWhite, IndexedColor::Red),
+    (IndexedColor::BrightWhite, IndexedColor::BrightBlack),
+    (IndexedColor::BrightBlack, IndexedColor::BrightWhite),
 ];
 
 pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
@@ -315,39 +327,28 @@ pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
             ctx.scrollarea_begin("colors", Size { width: 0, height: height - 3 });
             ctx.attr_background_rgba(ctx.indexed_alpha(IndexedColor::Black, 1, 4));
             {
-                ctx.table_begin("matrix");
-                let mut columns = [7; THEME_COLOR_COUNT + 1];
-                columns[0] = 6;
-                ctx.table_set_columns(&columns);
+                ctx.table_begin("pairs");
+                ctx.table_set_columns(&[8, 8, 16]);
 
                 ctx.table_next_row();
-                ctx.label("corner", "fg/bg");
+                ctx.label("fg-header", "fg");
                 ctx.attr_overflow(Overflow::TruncateTail);
-                for (bg, name) in THEME_COLOR_NAMES.iter().enumerate() {
-                    ctx.next_block_id_mixin(bg as u64);
-                    let bg_color = indexed_color(bg);
-                    ctx.label("bg", name);
-                    ctx.attr_background_rgba(ctx.indexed(bg_color));
-                    ctx.attr_foreground_rgba(ctx.contrasted(ctx.indexed(bg_color)));
-                    ctx.attr_overflow(Overflow::TruncateTail);
-                }
+                ctx.label("bg-header", "bg");
+                ctx.attr_overflow(Overflow::TruncateTail);
+                ctx.label("sample-header", "sample");
+                ctx.attr_overflow(Overflow::TruncateTail);
 
-                for (fg, name) in THEME_COLOR_NAMES.iter().enumerate() {
-                    ctx.next_block_id_mixin(fg as u64);
+                for (index, &(fg, bg)) in THEME_COLOR_PAIRS.iter().enumerate() {
+                    ctx.next_block_id_mixin(index as u64);
                     ctx.table_next_row();
-                    let fg_color = indexed_color(fg);
-                    ctx.label("fg", name);
-                    ctx.attr_foreground_rgba(ctx.indexed(fg_color));
+                    ctx.label("fg", indexed_color_name(fg));
                     ctx.attr_overflow(Overflow::TruncateTail);
-
-                    for bg in 0..THEME_COLOR_COUNT {
-                        ctx.next_block_id_mixin(((fg * THEME_COLOR_COUNT) + bg) as u64);
-                        let bg_color = indexed_color(bg);
-                        ctx.label("swatch", &arena_format!(ctx.arena(), "{fg:02}/{bg:02}"));
-                        ctx.attr_background_rgba(ctx.indexed(bg_color));
-                        ctx.attr_foreground_rgba(ctx.indexed(fg_color));
-                        ctx.attr_overflow(Overflow::TruncateTail);
-                    }
+                    ctx.label("bg", indexed_color_name(bg));
+                    ctx.attr_overflow(Overflow::TruncateTail);
+                    ctx.label("sample", "Sample text");
+                    ctx.attr_background_rgba(ctx.indexed(bg));
+                    ctx.attr_foreground_rgba(ctx.indexed(fg));
+                    ctx.attr_overflow(Overflow::TruncateTail);
                 }
                 ctx.table_end();
             }
@@ -366,26 +367,25 @@ pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
     }
 }
 
-fn indexed_color(index: usize) -> IndexedColor {
-    match index {
-        0 => IndexedColor::Black,
-        1 => IndexedColor::Red,
-        2 => IndexedColor::Green,
-        3 => IndexedColor::Yellow,
-        4 => IndexedColor::Blue,
-        5 => IndexedColor::Magenta,
-        6 => IndexedColor::Cyan,
-        7 => IndexedColor::White,
-        8 => IndexedColor::BrightBlack,
-        9 => IndexedColor::BrightRed,
-        10 => IndexedColor::BrightGreen,
-        11 => IndexedColor::BrightYellow,
-        12 => IndexedColor::BrightBlue,
-        13 => IndexedColor::BrightMagenta,
-        14 => IndexedColor::BrightCyan,
-        15 => IndexedColor::BrightWhite,
-        16 => IndexedColor::Background,
-        17 => IndexedColor::Foreground,
-        _ => unreachable!(),
+fn indexed_color_name(color: IndexedColor) -> &'static str {
+    match color {
+        IndexedColor::Black => "black",
+        IndexedColor::Red => "red",
+        IndexedColor::Green => "green",
+        IndexedColor::Yellow => "yellow",
+        IndexedColor::Blue => "blue",
+        IndexedColor::Magenta => "magenta",
+        IndexedColor::Cyan => "cyan",
+        IndexedColor::White => "white",
+        IndexedColor::BrightBlack => "brBlack",
+        IndexedColor::BrightRed => "brRed",
+        IndexedColor::BrightGreen => "brGreen",
+        IndexedColor::BrightYellow => "brYellow",
+        IndexedColor::BrightBlue => "brBlue",
+        IndexedColor::BrightMagenta => "brMagenta",
+        IndexedColor::BrightCyan => "brCyan",
+        IndexedColor::BrightWhite => "brWhite",
+        IndexedColor::Background => "background",
+        IndexedColor::Foreground => "foreground",
     }
 }
