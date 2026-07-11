@@ -302,10 +302,19 @@ mod tests {
 
         // Two hits in a.txt, one in sub/b.txt (case-insensitive).
         // The .git file is ignored and the binary file is skipped.
-        assert_eq!(results.len(), 3, "results: {:?}", results.iter().map(|r| &r.location).collect::<Vec<_>>());
+        assert_eq!(
+            results.len(),
+            3,
+            "results: {:?}",
+            results.iter().map(|r| &r.location).collect::<Vec<_>>()
+        );
         assert!(results.iter().all(|r| !r.text.contains("ignored")));
         assert!(results.iter().all(|r| !r.text.contains("binary")));
-        assert!(results.iter().any(|r| r.location.contains("sub/b.txt") || r.location.contains("sub\\b.txt")));
+        assert!(
+            results
+                .iter()
+                .any(|r| r.location.contains("sub/b.txt") || r.location.contains("sub\\b.txt"))
+        );
 
         // Case-sensitive should drop the uppercase HELLO in sub/b.txt.
         let sensitive = scan_directory(

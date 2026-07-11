@@ -1,5 +1,9 @@
 # Contributing
 
+## Releases
+
+Maintainers can find the release checklist in [`RELEASE.md`](./RELEASE.md).
+
 ## Translation improvements
 
 You can find our translations in [`i18n/edit.toml`](./i18n/edit.toml).

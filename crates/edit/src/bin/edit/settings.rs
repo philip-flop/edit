@@ -72,9 +72,9 @@ const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
             "    // \"key\" is optional and accepts things like \"F5\" or \"Ctrl+Shift+B\".\n",
             "    // \"$FILE\" in \"command\" is replaced with the current file's path.\n",
             "    // \"commands\": [\n",
-            "    //     { \"name\": \"Build\", \"command\": \"cargo build\", \"key\": \"F5\" },\n",
+            "    //     { \"name\": \"Build\", \"command\": \"cargo build --release\", \"key\": \"F5\" },\n",
             "    //     { \"name\": \"Run gofmt on file\", \"command\": \"gofmt -w $FILE\" }\n",
-            "    // ]\n",
+            "    // ],\n",
         )
         .as_bytes(),
     ),
@@ -201,6 +201,14 @@ pub enum Theme {
 }
 
 impl Theme {
+    pub const ALL: [Self; 5] = [
+        Self::System,
+        Self::CatppuccinLatte,
+        Self::CatppuccinFrappe,
+        Self::CatppuccinMacchiato,
+        Self::CatppuccinMocha,
+    ];
+
     fn from_id(id: &str) -> Option<Self> {
         Some(match id {
             "system" => Theme::System,
@@ -247,6 +255,7 @@ static SETTINGS: SettingsCell = SettingsCell(SemiRefCell::new(Settings::new()));
 /// Set when the settings file is saved from within the editor, so the main
 /// loop knows to reload settings and re-apply the theme without a restart.
 static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
+static THEME_CHANGE_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 impl Settings {
     /// Fills the given settings.json text buffer with some initial contents for convenience.
@@ -334,6 +343,18 @@ impl Settings {
     /// Returns and clears a pending reload request. See [`Settings::note_saved`].
     pub fn take_reload_request() -> bool {
         RELOAD_REQUESTED.swap(false, Ordering::Relaxed)
+    }
+
+    pub fn set_theme(theme: Theme) {
+        let s = &mut *SETTINGS.0.borrow_mut();
+        if s.theme != theme {
+            s.theme = theme;
+            THEME_CHANGE_REQUESTED.store(true, Ordering::Relaxed);
+        }
+    }
+
+    pub fn take_theme_change_request() -> bool {
+        THEME_CHANGE_REQUESTED.swap(false, Ordering::Relaxed)
     }
 
     pub fn reload() -> apperr::Result<()> {
@@ -550,16 +571,16 @@ fn config_dir() -> Option<PathBuf> {
 
     #[cfg(target_os = "windows")]
     {
-        var_path("APPDATA").map(|p| push(p, "Microsoft\\Edit"))
+        var_path("APPDATA").map(|p| push(p, "JEdit"))
     }
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
-        var_path("HOME").map(|p| push(p, "Library/Application Support/com.microsoft.edit"))
+        var_path("HOME").map(|p| push(p, "Library/Application Support/jedit"))
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "ios")))]
     {
         var_path("XDG_CONFIG_HOME")
             .or_else(|| var_path("HOME").map(|p| push(p, ".config")))
-            .map(|p| push(p, "msedit"))
+            .map(|p| push(p, "jedit"))
     }
 }

@@ -1,0 +1,96 @@
+name: Build release assets
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to upload assets to, for example v20.0.0
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset_suffix }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_suffix: x86_64-linux
+            binary_name: jedit
+            archive_ext: tar.gz
+            install_packages: sudo apt-get update && sudo apt-get install -y libicu-dev
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset_suffix: aarch64-macos
+            binary_name: jedit
+            archive_ext: tar.gz
+            install_packages: "true"
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_suffix: x86_64-windows
+            binary_name: jedit.exe
+            archive_ext: zip
+            install_packages: echo No system dependencies required
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            asset_suffix: aarch64-windows
+            binary_name: jedit.exe
+            archive_ext: zip
+            install_packages: echo No system dependencies required
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Install system dependencies
+        run: ${{ matrix.install_packages }}
+
+      - name: Install Rust
+        run: rustup toolchain install nightly --no-self-update --profile minimal --component rust-src
+
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }} --toolchain nightly
+
+      - name: Build release binary
+        run: cargo +nightly build -p edit --release --target ${{ matrix.target }} --config .cargo/release.toml
+        env:
+          RUSTC_BOOTSTRAP: 1
+
+      - name: Package release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}"
+          version="${tag#v}"
+          archive_name="jedit-${version}-${{ matrix.asset_suffix }}"
+          mkdir -p "dist/${archive_name}"
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${archive_name}/${{ matrix.binary_name }}"
+          cp LICENSE README.md "dist/${archive_name}/"
+          cp assets/manpage/jedit.1 "dist/${archive_name}/"
+          if [ "${{ matrix.archive_ext }}" = "zip" ]; then
+            powershell -NoProfile -Command "Compress-Archive -Path 'dist/${archive_name}/*' -DestinationPath 'dist/${archive_name}.zip' -Force"
+          else
+            tar -czf "dist/${archive_name}.tar.gz" -C dist "${archive_name}"
+          fi
+
+      - name: Upload release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}"
+          version="${tag#v}"
+          gh release upload "$tag" "dist/jedit-${version}-${{ matrix.asset_suffix }}.${{ matrix.archive_ext }}" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

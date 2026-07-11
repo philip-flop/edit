@@ -1,6 +1,6 @@
 [package]
 name = "edit"
-version = "2.1.0"
+version = "20.0.0"
 
 edition.workspace = true
 license.workspace = true
@@ -9,6 +9,10 @@ rust-version.workspace = true
 
 build = "build/main.rs"
 categories = ["text-editors"]
+
+[[bin]]
+name = "jedit"
+path = "src/bin/edit/main.rs"
 
 [[bench]]
 name = "lib"

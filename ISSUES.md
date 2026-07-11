@@ -1,12 +1,6 @@
-Issues
+Issue list:
 
-- [x] The menu bar background and text color are too close to each other. This could be bad logic in the contrast tui functions.
-- [x] Selecting a folder in the file browser with the arrow key or enter focuses the text editor instead of opening the folder
-- [x] The file browser should have an edit box on top that will filter all files that match a fuzzy find. Files in folders, make the folder match as well.
-- [x] CTRL + / might not work on Ghostty. This could be an issue with using it in Zellij. Needs more investigation (kitty-protocol terminals reporting Ctrl+/ as codepoint 31 in CSI-u were dropped; now mapped to Ctrl+/)
-- [x] Highlight the line when doing a search with find in files
-- [x] Highlighted text has bad contrast. Could be related to the first issue
-- [x] Auto populate find or find-in-files with selected text. If none, clear the search field
-- [x] Add a setting to show the file browser at startup if the editor is over 80 chars wide
-- [x] Add a setting to enable developer mode. This will show a "Debug" item in the menu bar. Then add an entry called "Show Theme Colors". This will show a popup that shows all of the combonations of bg and fg colors.
-
+- [x] Filter the theme colors shown in developer mode to the fg/bg color pairs used in code.
+- [x] Make the highlighted line in the editor with a little more alpha.
+- [x] CMD + Left/Right does not jump to the next/prev word
+- [x] Find (CTRL+F) should select the next item if there already is a selection

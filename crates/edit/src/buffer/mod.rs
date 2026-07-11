@@ -1267,13 +1267,14 @@ impl TextBuffer {
         }
 
         // If the user moved the cursor since the last search, but the needle remained the same,
-        // we still need to move the start of the search to the new cursor position.
+        // we still need to move the start of the search to the new cursor position. A user
+        // selection is the current match, so start just after it to find the next occurrence.
         let next_search_offset = if self.selection_generation == search.selection_generation {
             search.next_search_offset
         } else {
             match self.selection {
                 Some(TextBufferSelection { beg, end }) => {
-                    self.cursor_move_to_logical_internal(self.cursor, beg.min(end)).offset
+                    self.cursor_move_to_logical_internal(self.cursor, beg.max(end)).offset
                 }
                 _ => self.cursor.offset,
             }
@@ -1310,9 +1311,8 @@ impl TextBuffer {
 
             let mut bytes = Vec::new();
             self.buffer.extract_raw(line_start.offset..line_end.offset, &mut bytes, 0);
-            let line_text = String::from_utf8_lossy(&bytes)
-                .trim_end_matches(['\r', '\n'])
-                .to_string();
+            let line_text =
+                String::from_utf8_lossy(&bytes).trim_end_matches(['\r', '\n']).to_string();
 
             out.push(SearchMatch {
                 line: pos.y + 1,
@@ -2266,7 +2266,7 @@ impl TextBuffer {
                             right: destination.right,
                             bottom: cursor.y + 1,
                         },
-                        StraightRgba::from_le(0x7f7f7f7f),
+                        StraightRgba::from_le(0x3f3f3f3f),
                     );
                 }
             }
@@ -2676,6 +2676,35 @@ impl TextBuffer {
         self.set_selection(None);
     }
 
+    pub fn backspace_unindent(&mut self) -> bool {
+        if self.selection.is_some() || self.cursor.offset == 0 {
+            return false;
+        }
+
+        let line_start = self.goto_line_start(self.cursor, self.cursor.logical_pos.y);
+        let (indent_chars, _) = self.measure_indent_internal(line_start.offset, CoordType::MAX);
+
+        let chars_from_line_start = self.cursor.logical_pos.x;
+        if chars_from_line_start == 0 || chars_from_line_start > indent_chars {
+            return false;
+        }
+
+        let cursor_column = self.cursor.column;
+        if cursor_column == 0 {
+            return false;
+        }
+
+        let prev_column = self.tab_size_prev_column(cursor_column);
+        let (prev_chars, _) = self.measure_indent_internal(line_start.offset, prev_column);
+        let chars_to_delete = chars_from_line_start - prev_chars;
+        if chars_to_delete <= 0 {
+            return false;
+        }
+
+        self.delete(CursorMovement::Grapheme, -chars_to_delete);
+        true
+    }
+
     /// Returns the logical position of the first character on this line.
     /// Return `.x == 0` if there are no non-whitespace characters.
     pub fn indent_end_logical_pos(&self) -> Point {
@@ -2955,8 +2984,11 @@ impl TextBuffer {
         let del_beg_off = if has_newline || beg <= 0 {
             start
         } else {
-            self.cursor_move_to_logical_internal(self.cursor, Point { x: CoordType::MAX, y: beg - 1 })
-                .offset
+            self.cursor_move_to_logical_internal(
+                self.cursor,
+                Point { x: CoordType::MAX, y: beg - 1 },
+            )
+            .offset
         };
 
         if stop <= del_beg_off {
@@ -3599,6 +3631,28 @@ mod tests {
     }
 
     #[test]
+    fn backspace_unindent_deletes_to_previous_indent_stop() {
+        let mut buf = new_buffer(b"      item\n");
+        buf.cursor_move_to_logical(Point { x: 6, y: 0 });
+
+        assert!(buf.backspace_unindent());
+
+        assert_eq!(buffer_contents(&mut buf), "    item\n");
+        assert_eq!(buf.cursor_logical_pos(), Point { x: 4, y: 0 });
+    }
+
+    #[test]
+    fn backspace_unindent_ignores_non_indent_text() {
+        let mut buf = new_buffer(b"  item\n");
+        buf.cursor_move_to_logical(Point { x: 3, y: 0 });
+
+        assert!(!buf.backspace_unindent());
+
+        assert_eq!(buffer_contents(&mut buf), "  item\n");
+        assert_eq!(buf.cursor_logical_pos(), Point { x: 3, y: 0 });
+    }
+
+    #[test]
     fn move_line_down_and_up() {
         let mut buf = new_buffer(b"one\ntwo\nthree\n");
         buf.cursor_move_to_logical(Point { x: 0, y: 0 });
@@ -3701,6 +3755,30 @@ mod tests {
         // The match cap is honored.
         let capped = buf.find_all("foo", SearchOptions::default(), 1).unwrap();
         assert_eq!(capped.len(), 1);
+    }
+
+    #[test]
+    fn find_selects_next_match_after_user_selection() {
+        let mut buf = new_buffer(b"the and the plus the\n");
+        buf.selection_update_logical(Point { x: 3, y: 0 });
+
+        buf.find_and_select("the", SearchOptions::default()).unwrap();
+
+        let (beg, end) = buf.selection_range().unwrap();
+        assert_eq!(beg.logical_pos, Point { x: 8, y: 0 });
+        assert_eq!(end.logical_pos, Point { x: 11, y: 0 });
+
+        buf.find_and_select("the", SearchOptions::default()).unwrap();
+
+        let (beg, end) = buf.selection_range().unwrap();
+        assert_eq!(beg.logical_pos, Point { x: 17, y: 0 });
+        assert_eq!(end.logical_pos, Point { x: 20, y: 0 });
+
+        buf.find_and_select("the", SearchOptions::default()).unwrap();
+
+        let (beg, end) = buf.selection_range().unwrap();
+        assert_eq!(beg.logical_pos, Point { x: 0, y: 0 });
+        assert_eq!(end.logical_pos, Point { x: 3, y: 0 });
     }
 
     #[test]

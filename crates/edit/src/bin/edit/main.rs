@@ -105,8 +105,8 @@ fn run() -> apperr::Result<()> {
     apply_theme_colors(&mut tui, &mut state);
 
     state.file_pane_visible = Settings::borrow().file_browser_show_at_startup;
-    if tui.size().width > 40{
-        state.file_pane_visible =  false;
+    if tui.size().width > 40 {
+        state.file_pane_visible = false;
     }
 
     sys::inject_window_size_into_stdin();
@@ -177,6 +177,19 @@ fn run() -> apperr::Result<()> {
             if let Err(err) = Settings::reload() {
                 state.add_error(err);
             }
+            apply_theme_colors(&mut tui, &mut state);
+
+            {
+                let mut ctx = tui.create_context(None);
+                draw(&mut ctx, &mut state);
+            }
+            while tui.needs_settling() {
+                let mut ctx = tui.create_context(None);
+                draw(&mut ctx, &mut state);
+            }
+        }
+
+        if Settings::take_theme_change_request() {
             apply_theme_colors(&mut tui, &mut state);
 
             {
@@ -320,7 +333,7 @@ fn handle_stdin(state: &mut State) -> apperr::Result<()> {
 
 fn print_help() {
     sys::write_stdout(concat!(
-        "Usage: edit [OPTIONS] [FILE[:LINE[:COLUMN]]]\n",
+        "Usage: jedit [OPTIONS] [FILE[:LINE[:COLUMN]]]\n",
         "Options:\n",
         "    -h, --help       Print this help message\n",
         "    -v, --version    Print the version number\n",
@@ -331,7 +344,7 @@ fn print_help() {
 }
 
 fn print_version() {
-    sys::write_stdout(concat!("edit version ", env!("CARGO_PKG_VERSION"), "\n"));
+    sys::write_stdout(concat!("jedit version ", env!("CARGO_PKG_VERSION"), "\n"));
 }
 
 fn draw(ctx: &mut Context, state: &mut State) {
@@ -408,8 +421,13 @@ fn draw(ctx: &mut Context, state: &mut State) {
             state.file_pane_focus = true;
         } else if key == kbmod::CTRL | vk::F && state.wants_search.kind != StateSearchKind::Disabled
         {
-            state.wants_search.kind = StateSearchKind::Search;
-            state.wants_search.focus = true;
+            if state.wants_search.kind == StateSearchKind::Search && !state.search_needle.is_empty()
+            {
+                search_execute(ctx, state, SearchAction::Search);
+            } else {
+                state.wants_search.kind = StateSearchKind::Search;
+                state.wants_search.focus = true;
+            }
         } else if key == kbmod::CTRL | vk::R && state.wants_search.kind != StateSearchKind::Disabled
         {
             state.wants_search.kind = StateSearchKind::Replace;
@@ -468,7 +486,7 @@ fn write_terminal_title<'a>(arena: &'a Arena, output: &mut BString<'a>, state: &
         output.push_str(arena, &sanitize_control_chars(filename));
         output.push_str(arena, " - ");
     }
-    output.push_str(arena, "edit\x1b\\");
+    output.push_str(arena, "jedit\x1b\\");
 
     state.osc_title_file_status.filename = filename.to_string();
     state.osc_title_file_status.dirty = dirty;

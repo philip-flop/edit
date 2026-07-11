@@ -2,14 +2,14 @@
 // Licensed under the MIT License.
 
 use edit::buffer::MoveLineDirection;
-use edit::framebuffer::IndexedColor;
+use edit::framebuffer::{Attributes, IndexedColor};
 use edit::helpers::*;
 use edit::input::{kbmod, vk};
 use edit::tui::*;
 use stdext::arena_format;
 
 use crate::localization::*;
-use crate::settings::{CommandSpec, Settings};
+use crate::settings::{CommandSpec, Settings, Theme};
 use crate::state::*;
 
 pub fn draw_menubar(ctx: &mut Context, state: &mut State) {
@@ -136,11 +136,11 @@ fn draw_menu_edit(ctx: &mut Context, state: &mut State) {
         tb.delete_lines();
         ctx.needs_rerender();
     }
-    if let Some(token) = tb.language().and_then(edit::lsh::line_comment_token) {
-        if ctx.menubar_menu_button(loc(LocId::EditToggleComment), 'G', kbmod::CTRL | vk::SLASH) {
-            tb.toggle_line_comment(token);
-            ctx.needs_rerender();
-        }
+    if let Some(token) = tb.language().and_then(edit::lsh::line_comment_token)
+        && ctx.menubar_menu_button(loc(LocId::EditToggleComment), 'G', kbmod::CTRL | vk::SLASH)
+    {
+        tb.toggle_line_comment(token);
+        ctx.needs_rerender();
     }
     ctx.menubar_menu_end();
 }
@@ -178,7 +178,29 @@ fn draw_menu_view(ctx: &mut Context, state: &mut State) {
         ctx.needs_rerender();
     }
 
+    if ctx.menubar_submenu_begin(loc(LocId::ViewSetTheme), 'T') {
+        draw_menu_theme_choices(ctx);
+        ctx.menubar_submenu_end();
+    }
+
     ctx.menubar_menu_end();
+}
+
+fn draw_menu_theme_choices(ctx: &mut Context) {
+    let current_theme = Settings::borrow().theme;
+    for theme in Theme::ALL {
+        let label = match theme {
+            Theme::System => loc(LocId::ViewThemeSystem),
+            Theme::CatppuccinLatte => loc(LocId::ViewThemeCatppuccinLatte),
+            Theme::CatppuccinFrappe => loc(LocId::ViewThemeCatppuccinFrappe),
+            Theme::CatppuccinMacchiato => loc(LocId::ViewThemeCatppuccinMacchiato),
+            Theme::CatppuccinMocha => loc(LocId::ViewThemeCatppuccinMocha),
+        };
+        if ctx.menubar_menu_checkbox(label, '\0', vk::NULL, current_theme == theme) {
+            Settings::set_theme(theme);
+            ctx.needs_rerender();
+        }
+    }
 }
 
 fn draw_menu_command(ctx: &mut Context, state: &mut State) {
@@ -234,7 +256,7 @@ pub fn draw_dialog_about(ctx: &mut Context, state: &mut State) {
         ctx.inherit_focus();
         ctx.attr_padding(Rect::three(1, 2, 1));
         {
-            ctx.label("description", "Microsoft Edit");
+            ctx.label("description", "jedit");
             ctx.attr_overflow(Overflow::TruncateTail);
             ctx.attr_position(Position::Center);
 
@@ -273,10 +295,22 @@ pub fn draw_dialog_about(ctx: &mut Context, state: &mut State) {
     }
 }
 
-const THEME_COLOR_COUNT: usize = 18;
-const THEME_COLOR_NAMES: [&str; THEME_COLOR_COUNT] = [
-    "blk", "red", "grn", "ylw", "blu", "mag", "cyn", "wht", "bBlk", "bRed", "bGrn", "bYlw", "bBlu",
-    "bMag", "bCyn", "bWht", "bg", "fg",
+/// Explicit indexed foreground/background pairs used by editor text and UI.
+/// Colors derived through alpha blending or `contrasted()` are intentionally
+/// omitted because they are not fixed palette pairs.
+const THEME_COLOR_PAIRS: &[(IndexedColor, IndexedColor)] = &[
+    (IndexedColor::Foreground, IndexedColor::Background),
+    (IndexedColor::Green, IndexedColor::Background),
+    (IndexedColor::BrightYellow, IndexedColor::Background),
+    (IndexedColor::BrightRed, IndexedColor::Background),
+    (IndexedColor::BrightCyan, IndexedColor::Background),
+    (IndexedColor::BrightBlue, IndexedColor::Background),
+    (IndexedColor::BrightGreen, IndexedColor::Background),
+    (IndexedColor::BrightMagenta, IndexedColor::Background),
+    (IndexedColor::Black, IndexedColor::White),
+    (IndexedColor::BrightWhite, IndexedColor::Red),
+    (IndexedColor::BrightWhite, IndexedColor::BrightBlack),
+    (IndexedColor::BrightBlack, IndexedColor::BrightWhite),
 ];
 
 pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
@@ -293,39 +327,26 @@ pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
             ctx.scrollarea_begin("colors", Size { width: 0, height: height - 3 });
             ctx.attr_background_rgba(ctx.indexed_alpha(IndexedColor::Black, 1, 4));
             {
-                ctx.table_begin("matrix");
-                let mut columns = [7; THEME_COLOR_COUNT + 1];
-                columns[0] = 6;
-                ctx.table_set_columns(&columns);
+                ctx.table_begin("pairs");
+                ctx.table_set_columns(&[10, 10, 16]);
+                ctx.table_set_cell_gap(Size { width: 1, height: 0 });
 
                 ctx.table_next_row();
-                ctx.label("corner", "fg/bg");
-                ctx.attr_overflow(Overflow::TruncateTail);
-                for bg in 0..THEME_COLOR_COUNT {
-                    ctx.next_block_id_mixin(bg as u64);
-                    let bg_color = indexed_color(bg);
-                    ctx.label("bg", THEME_COLOR_NAMES[bg]);
-                    ctx.attr_background_rgba(ctx.indexed(bg_color));
-                    ctx.attr_foreground_rgba(ctx.contrasted(ctx.indexed(bg_color)));
-                    ctx.attr_overflow(Overflow::TruncateTail);
-                }
+                draw_theme_color_header(ctx, "fg-header", "Foreground");
+                draw_theme_color_header(ctx, "bg-header", "Background");
+                draw_theme_color_header(ctx, "sample-header", "Sample");
 
-                for fg in 0..THEME_COLOR_COUNT {
-                    ctx.next_block_id_mixin(fg as u64);
+                for (index, &(fg, bg)) in THEME_COLOR_PAIRS.iter().enumerate() {
+                    ctx.next_block_id_mixin(index as u64);
                     ctx.table_next_row();
-                    let fg_color = indexed_color(fg);
-                    ctx.label("fg", THEME_COLOR_NAMES[fg]);
-                    ctx.attr_foreground_rgba(ctx.indexed(fg_color));
+                    ctx.label("fg", indexed_color_name(fg));
                     ctx.attr_overflow(Overflow::TruncateTail);
-
-                    for bg in 0..THEME_COLOR_COUNT {
-                        ctx.next_block_id_mixin(((fg * THEME_COLOR_COUNT) + bg) as u64);
-                        let bg_color = indexed_color(bg);
-                        ctx.label("swatch", &arena_format!(ctx.arena(), "{fg:02}/{bg:02}"));
-                        ctx.attr_background_rgba(ctx.indexed(bg_color));
-                        ctx.attr_foreground_rgba(ctx.indexed(fg_color));
-                        ctx.attr_overflow(Overflow::TruncateTail);
-                    }
+                    ctx.label("bg", indexed_color_name(bg));
+                    ctx.attr_overflow(Overflow::TruncateTail);
+                    ctx.label("sample", "Sample text");
+                    ctx.attr_background_rgba(ctx.indexed(bg));
+                    ctx.attr_foreground_rgba(ctx.indexed(fg));
+                    ctx.attr_overflow(Overflow::TruncateTail);
                 }
                 ctx.table_end();
             }
@@ -344,26 +365,37 @@ pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
     }
 }
 
-fn indexed_color(index: usize) -> IndexedColor {
-    match index {
-        0 => IndexedColor::Black,
-        1 => IndexedColor::Red,
-        2 => IndexedColor::Green,
-        3 => IndexedColor::Yellow,
-        4 => IndexedColor::Blue,
-        5 => IndexedColor::Magenta,
-        6 => IndexedColor::Cyan,
-        7 => IndexedColor::White,
-        8 => IndexedColor::BrightBlack,
-        9 => IndexedColor::BrightRed,
-        10 => IndexedColor::BrightGreen,
-        11 => IndexedColor::BrightYellow,
-        12 => IndexedColor::BrightBlue,
-        13 => IndexedColor::BrightMagenta,
-        14 => IndexedColor::BrightCyan,
-        15 => IndexedColor::BrightWhite,
-        16 => IndexedColor::Background,
-        17 => IndexedColor::Foreground,
-        _ => unreachable!(),
+fn draw_theme_color_header(ctx: &mut Context, classname: &'static str, text: &str) {
+    ctx.block_begin(classname);
+    {
+        ctx.styled_label_begin("text");
+        ctx.styled_label_set_attributes(Attributes::Bold);
+        ctx.styled_label_add_text(text);
+        ctx.styled_label_end();
+        ctx.attr_position(Position::Center);
+    }
+    ctx.block_end();
+}
+
+fn indexed_color_name(color: IndexedColor) -> &'static str {
+    match color {
+        IndexedColor::Black => "black",
+        IndexedColor::Red => "red",
+        IndexedColor::Green => "green",
+        IndexedColor::Yellow => "yellow",
+        IndexedColor::Blue => "blue",
+        IndexedColor::Magenta => "magenta",
+        IndexedColor::Cyan => "cyan",
+        IndexedColor::White => "white",
+        IndexedColor::BrightBlack => "brBlack",
+        IndexedColor::BrightRed => "brRed",
+        IndexedColor::BrightGreen => "brGreen",
+        IndexedColor::BrightYellow => "brYellow",
+        IndexedColor::BrightBlue => "brBlue",
+        IndexedColor::BrightMagenta => "brMagenta",
+        IndexedColor::BrightCyan => "brCyan",
+        IndexedColor::BrightWhite => "brWhite",
+        IndexedColor::Background => "background",
+        IndexedColor::Foreground => "foreground",
     }
 }

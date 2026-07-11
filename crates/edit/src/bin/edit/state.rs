@@ -175,7 +175,7 @@ pub struct State {
     pub file_pane_dir: DisplayablePathBuf,
     pub file_pane_dir_revision: u64, // Bumped every time `file_pane_dir` changes.
     pub file_pane_entries: Option<[Vec<DisplayablePathBuf>; 3]>, // ["..", directories, files]
-    pub file_pane_filter: String, // Fuzzy filter for the entries above.
+    pub file_pane_filter: String,    // Fuzzy filter for the entries above.
     pub file_pane_filtered: Option<[Vec<DisplayablePathBuf>; 3]>, // Cached filter results.
     pub wants_editor_focus: bool,    // Request to move keyboard focus back into the editor.
 

@@ -6,7 +6,7 @@ resolver = "2"
 [workspace.package]
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/microsoft/edit"
+repository = "https://github.com/philip-flop/edit"
 rust-version = "1.93"
 
 # We use `opt-level = "s"` as it significantly reduces binary size.
