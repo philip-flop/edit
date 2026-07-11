@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 use edit::buffer::MoveLineDirection;
-use edit::framebuffer::IndexedColor;
+use edit::framebuffer::{Attributes, IndexedColor};
 use edit::helpers::*;
 use edit::input::{kbmod, vk};
 use edit::tui::*;
@@ -328,15 +328,13 @@ pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
             ctx.attr_background_rgba(ctx.indexed_alpha(IndexedColor::Black, 1, 4));
             {
                 ctx.table_begin("pairs");
-                ctx.table_set_columns(&[8, 8, 16]);
+                ctx.table_set_columns(&[10, 10, 16]);
+                ctx.table_set_cell_gap(Size { width: 1, height: 0 });
 
                 ctx.table_next_row();
-                ctx.label("fg-header", "fg");
-                ctx.attr_overflow(Overflow::TruncateTail);
-                ctx.label("bg-header", "bg");
-                ctx.attr_overflow(Overflow::TruncateTail);
-                ctx.label("sample-header", "sample");
-                ctx.attr_overflow(Overflow::TruncateTail);
+                draw_theme_color_header(ctx, "fg-header", "Foreground");
+                draw_theme_color_header(ctx, "bg-header", "Background");
+                draw_theme_color_header(ctx, "sample-header", "Sample");
 
                 for (index, &(fg, bg)) in THEME_COLOR_PAIRS.iter().enumerate() {
                     ctx.next_block_id_mixin(index as u64);
@@ -365,6 +363,18 @@ pub fn draw_dialog_theme_colors(ctx: &mut Context, state: &mut State) {
     if ctx.modal_end() {
         state.wants_theme_colors = false;
     }
+}
+
+fn draw_theme_color_header(ctx: &mut Context, classname: &'static str, text: &str) {
+    ctx.block_begin(classname);
+    {
+        ctx.styled_label_begin("text");
+        ctx.styled_label_set_attributes(Attributes::Bold);
+        ctx.styled_label_add_text(text);
+        ctx.styled_label_end();
+        ctx.attr_position(Position::Center);
+    }
+    ctx.block_end();
 }
 
 fn indexed_color_name(color: IndexedColor) -> &'static str {
