@@ -421,8 +421,13 @@ fn draw(ctx: &mut Context, state: &mut State) {
             state.file_pane_focus = true;
         } else if key == kbmod::CTRL | vk::F && state.wants_search.kind != StateSearchKind::Disabled
         {
-            state.wants_search.kind = StateSearchKind::Search;
-            state.wants_search.focus = true;
+            if state.wants_search.kind == StateSearchKind::Search && !state.search_needle.is_empty()
+            {
+                search_execute(ctx, state, SearchAction::Search);
+            } else {
+                state.wants_search.kind = StateSearchKind::Search;
+                state.wants_search.focus = true;
+            }
         } else if key == kbmod::CTRL | vk::R && state.wants_search.kind != StateSearchKind::Disabled
         {
             state.wants_search.kind = StateSearchKind::Replace;

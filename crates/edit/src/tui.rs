@@ -165,7 +165,7 @@ use crate::{input, simd, unicode};
 const ROOT_ID: u64 = 0x14057B7EF767814F; // Knuth's MMIX constant
 const SHIFT_TAB: InputKey = vk::TAB.with_modifiers(kbmod::SHIFT);
 const KBMOD_FOR_WORD_NAV: InputKeyMod =
-    if cfg!(any(target_os = "macos", target_os = "ios")) { kbmod::ALT } else { kbmod::CTRL };
+    if cfg!(any(target_os = "macos", target_os = "ios")) { kbmod::ALT_SUPER } else { kbmod::CTRL };
 
 type Input<'input> = input::Input<'input>;
 type InputKey = input::InputKey;

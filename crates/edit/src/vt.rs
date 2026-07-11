@@ -253,6 +253,17 @@ impl<'input> Stream<'_, 'input> {
                                 return Some(Token::Csi(&self.parser.csi));
                             }
                             b';' => self.parser.csi.param_count += 1,
+                            // CSI subparameters (used by the Kitty keyboard
+                            // protocol for event types) are not represented
+                            // in `Csi`. Skip them without appending their
+                            // digits to the preceding parameter.
+                            b':' => {
+                                while self.off < bytes.len()
+                                    && (bytes[self.off].is_ascii_digit() || bytes[self.off] == b':')
+                                {
+                                    self.off += 1;
+                                }
+                            }
                             b'<'..=b'?' => self.parser.csi.private_byte = c as char,
                             _ => {}
                         }
