@@ -1009,6 +1009,9 @@ en = "Theme: Catppuccin Macchiato"
 [ViewThemeCatppuccinMocha]
 en = "Theme: Catppuccin Mocha"
 
+[ViewThemeWizTermDark]
+en = "Theme: WizTerm Dark"
+
 # A menu bar item
 [Command]
 en = "Command"

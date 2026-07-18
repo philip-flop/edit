@@ -195,6 +195,7 @@ fn draw_menu_theme_choices(ctx: &mut Context) {
             Theme::CatppuccinFrappe => loc(LocId::ViewThemeCatppuccinFrappe),
             Theme::CatppuccinMacchiato => loc(LocId::ViewThemeCatppuccinMacchiato),
             Theme::CatppuccinMocha => loc(LocId::ViewThemeCatppuccinMocha),
+            Theme::WizTermDark => loc(LocId::ViewThemeWizTermDark),
         };
         if ctx.menubar_menu_checkbox(label, '\0', vk::NULL, current_theme == theme) {
             Settings::set_theme(theme);

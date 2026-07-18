@@ -180,6 +180,29 @@ pub const CATPPUCCIN_MOCHA: [StraightRgba; INDEXED_COLORS_COUNT] = [
     StraightRgba::from_be(0xcdd6f4ff), // Foreground     (text)
 ];
 
+/// WizTerm Dark palette (dark). Matches the WezTerm "coolnight" colorscheme.
+pub const WIZTERM_DARK: [StraightRgba; INDEXED_COLORS_COUNT] = [
+    StraightRgba::from_be(0x214969ff), // Black
+    StraightRgba::from_be(0xe52e2eff), // Red
+    StraightRgba::from_be(0x44ffb1ff), // Green
+    StraightRgba::from_be(0xffe073ff), // Yellow
+    StraightRgba::from_be(0x0fc5edff), // Blue
+    StraightRgba::from_be(0xa277ffff), // Magenta
+    StraightRgba::from_be(0x24eaf7ff), // Cyan
+    StraightRgba::from_be(0x24eaf7ff), // White
+    StraightRgba::from_be(0x214969ff), // BrightBlack
+    StraightRgba::from_be(0xe52e2eff), // BrightRed
+    StraightRgba::from_be(0x44ffb1ff), // BrightGreen
+    StraightRgba::from_be(0xffe073ff), // BrightYellow
+    StraightRgba::from_be(0xa277ffff), // BrightBlue
+    StraightRgba::from_be(0xa277ffff), // BrightMagenta
+    StraightRgba::from_be(0x24eaf7ff), // BrightCyan
+    StraightRgba::from_be(0x24eaf7ff), // BrightWhite
+    // --------
+    StraightRgba::from_be(0x011423ff), // Background
+    StraightRgba::from_be(0xcbe0f0ff), // Foreground
+];
+
 /// A shoddy framebuffer for terminal applications.
 ///
 /// The idea is that you create a [`Framebuffer`], draw a bunch of text and
