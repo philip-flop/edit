@@ -6,7 +6,7 @@ use edit::buffer::TextBuffer;
 use edit::cell::{Ref, SemiRefCell};
 use edit::framebuffer::{
     CATPPUCCIN_FRAPPE, CATPPUCCIN_LATTE, CATPPUCCIN_MACCHIATO, CATPPUCCIN_MOCHA,
-    INDEXED_COLORS_COUNT,
+    INDEXED_COLORS_COUNT, WIZTERM_DARK,
 };
 use edit::input::{InputKey, kbmod, vk};
 use edit::json;
@@ -25,7 +25,7 @@ const SETTINGS_TEMPLATE_BLOCKS: &[(&[u8], &[u8])] = &[
         concat!(
             "    // Color theme. One of: \"system\" (follow the terminal palette),\n",
             "    // \"catppuccin-latte\", \"catppuccin-frappe\", \"catppuccin-macchiato\",\n",
-            "    // \"catppuccin-mocha\".\n",
+            "    // \"catppuccin-mocha\", \"wizterm-dark\".\n",
             "    // \"theme\": \"system\",\n",
         )
         .as_bytes(),
@@ -198,15 +198,17 @@ pub enum Theme {
     CatppuccinFrappe,
     CatppuccinMacchiato,
     CatppuccinMocha,
+    WizTermDark,
 }
 
 impl Theme {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::System,
         Self::CatppuccinLatte,
         Self::CatppuccinFrappe,
         Self::CatppuccinMacchiato,
         Self::CatppuccinMocha,
+        Self::WizTermDark,
     ];
 
     fn from_id(id: &str) -> Option<Self> {
@@ -216,6 +218,7 @@ impl Theme {
             "catppuccin-frappe" => Theme::CatppuccinFrappe,
             "catppuccin-macchiato" => Theme::CatppuccinMacchiato,
             "catppuccin-mocha" => Theme::CatppuccinMocha,
+            "wizterm-dark" => Theme::WizTermDark,
             _ => return None,
         })
     }
@@ -229,6 +232,7 @@ impl Theme {
             Theme::CatppuccinFrappe => CATPPUCCIN_FRAPPE,
             Theme::CatppuccinMacchiato => CATPPUCCIN_MACCHIATO,
             Theme::CatppuccinMocha => CATPPUCCIN_MOCHA,
+            Theme::WizTermDark => WIZTERM_DARK,
         })
     }
 }
